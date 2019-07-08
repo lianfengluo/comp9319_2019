@@ -25,6 +25,7 @@ class RLEBWT {
  private:
   std::string filepath_;
   std::string filename_;
+  bool load_index = true;
   int s_f_ = 0;
   int b_f_ = 0;
   int bb_f_ = 0;
@@ -46,6 +47,7 @@ class RLEBWT {
   std::unique_ptr<char[]> bb_f_buff_{nullptr};
   std::unique_ptr<int32_t[]> occ_s_table_{nullptr};
   std::unique_ptr<int32_t[]> occ_b_table_{nullptr};
+  std::unique_ptr<int32_t[]> occ_bb_table_{nullptr};
   std::unique_ptr<int32_t[]> select_b_table_{nullptr};
   std::unique_ptr<int32_t[]> select_bb_table_{nullptr};
   void Build_S_B_Index_LG(int s_f_, int b_f_);
@@ -57,6 +59,12 @@ class RLEBWT {
   void Sum_C_Table();
   void get_lower_uppder_bound(int& lower_bound, int& upper_bound, int c);
   int search_m_sm();
+  int search_r_sm();
+  int search_a_sm(std::unique_ptr<size_t[]>& results);
+  int search_n_sm(std::unique_ptr<char[]>& result);
+  int binary_search_s_sm(int pos_c, int c);
+  bool load_s = false, load_b = false, load_s_b = false, load_r_b = false,
+       load_bb = false, load_s_bb = false, load_r_s = false;
   // int Select_Sm(int index, const std::unique_ptr<int[]>& select_table,
   //               const std::unique_ptr<char[]>& f_buff);
   // bool large_threshold;

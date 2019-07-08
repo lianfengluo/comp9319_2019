@@ -27,7 +27,8 @@ const int NUMBER_OF_CHAR = 127;
 // 6.5MB
 const int MAX_FREE_MEMORY = TOTAL_SPACE - START_UP_SIZE;
 const int MAX_FREE_BITS = MAX_FREE_MEMORY * 8;
-const int _4 = sizeof(int32_t);
+const int MAX_SEARCH_PATTERN_LEN = 5000;
+const int MAX_RESULT_NUM = 5000;
 const int FIRST_BIT = (1 << 7);
 
 static bool IsPathExist(const std::string& s) {
@@ -43,7 +44,7 @@ RLEBWT::RLEBWT(char* argv[])
   for (int j = 0; j != NUMBER_OF_CHAR; ++j) {
     c_table_[j] = 0;
     c_s_table_[j] = 0;
-    mapping_table_[j] = 0;
+    mapping_table_[j] = -1;
   }
   mode = argv[1][1];
   index_folder_ = argv[3];
@@ -74,7 +75,7 @@ RLEBWT::RLEBWT(char* argv[])
   lseek(b_f_, 0, SEEK_SET);
   if (b_f_size_ > BUILD_SIZE && s_f_size_ > 1024) {
     large_file_ = true;
-    if (b_f_size_ * 2 + s_f_size_ <= MAX_FREE_MEMORY) {
+    if (b_f_size_ * 4 + s_f_size_ * 2 <= MAX_FREE_MEMORY) {
       medium_file_ = true;
     }
   }
@@ -228,7 +229,7 @@ void RLEBWT::Build_BB_Index_LG(std::string& bb_i_f_name) {
   auto w_buff = std::make_unique<int32_t[]>(WRITE_BUFF_CHUNK);
   int interval = std::ceil(static_cast<double>(s_f_size_) / b_f_size_ * 4);
   int write_pos = 0, num_of_1 = 0, bit_index = 0;
-  int c;
+  int c = 0;
   int max = c_s_table_[NUMBER_OF_CHAR - 1];
   while ((readByte = read(bb_f_, r_buff.get(), READ_BUFF_SIZE))) {
     for (int i = 0; i != readByte; ++i) {
@@ -258,11 +259,11 @@ void RLEBWT::Build_BB_Index_LG(std::string& bb_i_f_name) {
 
 void RLEBWT::Build_BB_Index_SM() {
   bb_f_buff_ = std::make_unique<char[]>(b_f_size_);
-  int write_pos = 0, bit_index = 0, num_of_1 = 0;
-  int c;
-  select_bb_table_ =
-      std::make_unique<int32_t[]>(s_f_size_ * sizeof(int32_t) * 2);
-  int max = c_s_table_[NUMBER_OF_CHAR - 1];
+  int write_pos = 0, bit_index = 0, num_of_1 = 0, c = 0, write_pos_bb = 0;
+  select_bb_table_ = std::make_unique<int32_t[]>(s_f_size_);
+  occ_bb_table_ = std::make_unique<int32_t[]>(
+      std::ceil(static_cast<double>(b_f_size_) / 4));
+  int max = c_s_table_[NUMBER_OF_CHAR - 1], count_4 = 0;
   int readByte = read(bb_f_, bb_f_buff_.get(), b_f_size_);
   for (int i = 0; i != readByte; ++i) {
     c = bb_f_buff_[i];
@@ -273,9 +274,17 @@ void RLEBWT::Build_BB_Index_SM() {
           select_bb_table_[write_pos] = bit_index;
           ++write_pos;
         }
-        if (max == num_of_1) break;
+        if (max == num_of_1) {
+          occ_bb_table_[write_pos_bb] = num_of_1;
+          return;
+        }
       }
       ++bit_index;
+    }
+    if (++count_4 == 4) {
+      count_4 = 0;
+      occ_bb_table_[write_pos_bb] = num_of_1;
+      ++write_pos_bb;
     }
   }
 }
@@ -285,10 +294,10 @@ void RLEBWT::Build_BB_Index() {
 #ifndef DEBUG_
   if (IsPathExist(bb_i_f_name)) return;
 #endif
-  if (large_file_) {
-    Build_BB_Index_LG(bb_i_f_name);
-  } else {
+  if (!large_file_) {
     Build_BB_Index_SM();
+  } else {
+    Build_BB_Index_LG(bb_i_f_name);
   }
 }
 
@@ -428,8 +437,9 @@ void RLEBWT::Build_S_B_Index_LG(int s_f, int b_f) {
 
 void RLEBWT::Build_S_B_Index_SM(int s_f, int b_f) {
   if (s_f_size_ == 0) throw std::runtime_error("Input file is empty.");
-  int space_can_be_use =
-      MAX_FREE_MEMORY - s_f_size_ - (sizeof(int32_t) * s_f_size_ * 2) * 2;
+  // s_f: s_f_size + s_f_i: s_f_size + b_f, bb_f: 2 * b_f_size + o_b, o_bb: 2 *
+  // b_f_size + select_b, select_bb: 2 * s_f_size
+  int space_can_be_use = MAX_FREE_MEMORY - 4 * b_f_size_ - 4 * s_f_size_;
   int chunk_size = num_of_char_ * sizeof(int32_t);
   int max_chunks_nums = space_can_be_use / chunk_size;
   int step_size =
@@ -443,10 +453,10 @@ void RLEBWT::Build_S_B_Index_SM(int s_f, int b_f) {
   auto temp_table = std::make_unique<int32_t[]>(num_of_char_);
   std::fill(temp_table.get(), temp_table.get() + num_of_char_, 0);
   occ_s_table_ = std::make_unique<int32_t[]>(real_chunks_nums * num_of_char_);
-  occ_b_table_ = std::make_unique<int32_t[]>(b_f_size_);
+  occ_b_table_ = std::make_unique<int32_t[]>(
+      std::ceil(static_cast<double>(b_f_size_) / 4));
   // every 4's 1 build the index
-  select_b_table_ =
-      std::make_unique<int32_t[]>(s_f_size_ * sizeof(int32_t) * 2);
+  select_b_table_ = std::make_unique<int32_t[]>(s_f_size_);
   int s_index = 0, num_of_1 = 0, write_pos_b = 0, step_count = 0, write_pos = 0,
       count_4 = 0, bit_index = 0, write_pos_s_b = 0;
   int c = 0, byte = 0;
@@ -486,21 +496,15 @@ void RLEBWT::Build_S_B_Index_SM(int s_f, int b_f) {
       ++bit_index;
     }
     if (done) {
-      occ_b_table_[write_pos_b++] = num_of_1;
+      occ_b_table_[write_pos_b] = num_of_1;
       break;
     }
-    if (++count_4 == _4) {
+    if (++count_4 == 4) {
       count_4 = 0;
-      occ_b_table_[write_pos_b++] = num_of_1;
+      occ_b_table_[write_pos_b] = num_of_1;
+      ++write_pos_b;
     }
   }
-  // #ifdef DEBUG_
-  //   for (int i = 0; i != NUMBER_OF_CHAR; ++i) {
-  //     if (c_table_[i] != 0) {
-  //       std::cout << static_cast<char>(i) << " : " << c_table_[i] << '\n';
-  //     }
-  //   }
-  // #endif
   Sum_C_Table();
 }
 
@@ -633,9 +637,10 @@ static int rank_sm_function(const std::unique_ptr<char[]>& buff,
   return occ_b;
 }
 
-static int Occ_Function_Sm(int c, int index_s, std::unique_ptr<int32_t[]>& occ,
-                           std::unique_ptr<char[]>& buff,
-                           std::unique_ptr<int32_t[]>& map_table,
+static int Occ_Function_Sm(int c, int index_s,
+                           const std::unique_ptr<int32_t[]>& occ,
+                           const std::unique_ptr<char[]>& buff,
+                           const std::unique_ptr<int32_t[]>& map_table,
                            int num_of_char, int step_size) {
   int chunk_s_location = index_s / step_size;
   int occ_s = 0;
@@ -655,14 +660,6 @@ void RLEBWT::get_lower_uppder_bound(int& lower_bound, int& upper_bound, int c) {
   int search_index = len_of_pattern_ - 1, padding_0_1 = 0, padding_0_2 = 0,
       pre_lower = 0, pre_upper = 0, upper_index = 0, lower_index = 0,
       max_index = c_table_[NUMBER_OF_CHAR - 1];
-#ifdef DEBUG_
-  // std::string
-  // s{"1111223445[[[[[[[]]]]]]]aaaaaaabbbbbbbddddeggiiiinnnnnnnnn"};
-  // std::string s{"12[[]]aaaabbnnn"};
-  // for (int i = 1; i <= 11; ++i) {
-  //   std::cout << Select_Sm(i, select_bb_table_, bb_f_buff_) << '\n';
-  // }
-#endif
   while (search_index > 0) {
     c = search_pattern_[--search_index];
     pre_lower = lower_bound;
@@ -676,12 +673,8 @@ void RLEBWT::get_lower_uppder_bound(int& lower_bound, int& upper_bound, int c) {
     lower_bound = c_s_table_[c - 1] + occurrence_1 + 1;
     upper_bound = c_s_table_[c - 1] + occurrence_2;
     if (lower_bound > upper_bound) {
-      // std::cout << "ttest\n";
       break;
     }
-    // std::cout << s_f_buff_[lower_index] << '\n';
-    // bool lower = (s_f_buff_[lower_index - 1] == c);
-    // bool upper = (s_f_buff_[upper_index - 1] == c);
     padding_0_1 =
         (s_f_buff_[lower_index - 1] == c)
             ? pre_lower - Select_Sm(lower_index, select_b_table_, b_f_buff_)
@@ -691,11 +684,7 @@ void RLEBWT::get_lower_uppder_bound(int& lower_bound, int& upper_bound, int c) {
             ? pre_upper - Select_Sm(upper_index, select_b_table_, b_f_buff_)
             : 0;
     if (s_f_buff_[lower_index - 1] != c) {
-      // if (lower_bound == static_cast<int>(s_f_size_)) {
-      //   lower_bound = max_index - 1;
-      // } else {
       lower_bound = Select_Sm(lower_bound, select_bb_table_, bb_f_buff_);
-      // }
     } else {
       lower_bound =
           Select_Sm(lower_bound, select_bb_table_, bb_f_buff_) + padding_0_1;
@@ -711,12 +700,6 @@ void RLEBWT::get_lower_uppder_bound(int& lower_bound, int& upper_bound, int c) {
       upper_bound =
           Select_Sm(upper_bound, select_bb_table_, bb_f_buff_) + padding_0_2;
     }
-    // #ifdef DEBUG_
-    //     for (int i = lower_bound; i <= upper_bound; ++i) {
-    //       std::cout << s[i];
-    //     }
-    //     std::cout << '\n';
-    // #endif
   }
 }
 
@@ -728,12 +711,310 @@ int RLEBWT::search_m_sm() {
   return count;
 }
 
+int RLEBWT::search_r_sm() {
+  int c = search_pattern_[len_of_pattern_ - 1], count = 0;
+  int lower_bound = c_table_[c - 1], upper_bound = c_table_[c] - 1;
+  get_lower_uppder_bound(lower_bound, upper_bound, c);
+  if (upper_bound >= lower_bound) {
+    int occ = 0, curr_index = 0, padding = 0, cc = 0;
+    int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
+    // std::cout << lower_bound << ' ' << upper_bound << '\n';
+    for (int i = lower_bound; i <= upper_bound; ++i) {
+      curr_index = i;
+      while (true) {
+        pre_index = curr_index;
+        rank_index = rank_sm_function(b_f_buff_, occ_b_table_, curr_index + 1);
+        cc = s_f_buff_[rank_index - 1];
+        if (cc == ']') {
+          ++count;
+          break;
+        }
+        occ = Occ_Function_Sm(cc, rank_index, occ_s_table_, s_f_buff_,
+                              mapping_table_, num_of_char_, step_s_size_);
+        curr_index = c_s_table_[cc - 1] + occ;
+        padding =
+            (s_f_buff_[rank_index - 1] == cc)
+                ? pre_index - Select_Sm(rank_index, select_b_table_, b_f_buff_)
+                : 0;
+        if (s_f_buff_[rank_index - 1] != cc) {
+          if (curr_index == static_cast<int>(s_f_size_)) {
+            curr_index = max_index - 1;
+          } else {
+            curr_index =
+                Select_Sm(curr_index + 1, select_bb_table_, bb_f_buff_) - 1;
+          }
+        } else {
+          curr_index =
+              Select_Sm(curr_index, select_bb_table_, bb_f_buff_) + padding;
+        }
+        if (lower_bound <= curr_index && curr_index <= upper_bound) {
+          break;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+int RLEBWT::search_a_sm(std::unique_ptr<size_t[]>& results) {
+  int c = search_pattern_[len_of_pattern_ - 1], count = 0;
+  int lower_bound = c_table_[c - 1], upper_bound = c_table_[c] - 1;
+  get_lower_uppder_bound(lower_bound, upper_bound, c);
+  if (upper_bound >= lower_bound) {
+    int occ = 0, curr_index = 0, padding = 0, cc = 0;
+    int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
+    for (int i = lower_bound; i <= upper_bound; ++i) {
+      size_t result = 0;
+      int result_len = 0;
+      curr_index = i;
+      bool record = false;
+      while (true) {
+        pre_index = curr_index;
+        rank_index = rank_sm_function(b_f_buff_, occ_b_table_, curr_index + 1);
+        cc = s_f_buff_[rank_index - 1];
+        if (cc == '[') {
+          results[count] = result;
+          ++count;
+          break;
+        }
+        if (record) {
+          result += (cc - '0') * static_cast<size_t>(std::powl(10, result_len));
+          ++result_len;
+        }
+        if (cc == ']') {
+          record = true;
+        }
+        occ = Occ_Function_Sm(cc, rank_index, occ_s_table_, s_f_buff_,
+                              mapping_table_, num_of_char_, step_s_size_);
+        curr_index = c_s_table_[cc - 1] + occ;
+        padding =
+            (s_f_buff_[rank_index - 1] == cc)
+                ? pre_index - Select_Sm(rank_index, select_b_table_, b_f_buff_)
+                : 0;
+        if (s_f_buff_[rank_index - 1] != cc) {
+          if (curr_index == static_cast<int>(s_f_size_)) {
+            curr_index = max_index - 1;
+          } else {
+            curr_index =
+                Select_Sm(curr_index + 1, select_bb_table_, bb_f_buff_) - 1;
+          }
+        } else {
+          curr_index =
+              Select_Sm(curr_index, select_bb_table_, bb_f_buff_) + padding;
+        }
+        if (lower_bound <= curr_index && curr_index <= upper_bound) {
+          break;
+        }
+      }
+    }
+  }
+  std::sort(results.get(), results.get() + count);
+  return count;
+}
+
+static int binary_search_char(int index, int num_of_char,
+                              const std::unique_ptr<int32_t[]>& c_table,
+                              const std::unique_ptr<int32_t[]>& rev_map) {
+  int start = 0, end = num_of_char - 1, mid = 0;
+  // std::cout << index << '\n';
+  while (true) {
+    if (start > end) break;
+    mid = (start + end) / 2;
+    if (mid == 0) {
+      if (0 <= index && index < c_table[rev_map[0]]) {
+        return rev_map[0];
+      }
+      start = 1;
+    } else {
+      int low = c_table[rev_map[mid - 1]], high = c_table[rev_map[mid]];
+      if (low <= index && index < high) {
+        return rev_map[mid];
+      } else if (index < low) {
+        end = mid - 1;
+      } else {
+        start = mid + 1;
+      }
+    }
+  }
+  return -1;
+}
+
+int RLEBWT::binary_search_s_sm(int pos_c, int c) {
+  int start = 1, end = s_f_size_, mid = 0, occ = 0;
+  while (true) {
+    mid = (start + end) / 2;
+    if (start > end) return -1;
+    occ = Occ_Function_Sm(c, mid, occ_s_table_, s_f_buff_, mapping_table_,
+                          num_of_char_, step_s_size_);
+    if (occ == pos_c) {
+      if (s_f_buff_[mid - 1] == c) {
+        return mid;
+      } else {
+        end = mid - 1;
+      }
+    } else if (occ < pos_c) {
+      start = mid + 1;
+    } else {
+      end = mid - 1;
+    }
+  }
+  return -1;
+}
+
+static int find_pre_1(int index, const std::unique_ptr<char[]>& buff) {
+  int pos = index / 8;
+  int bit_pos = index % 8;
+  int c = 0;
+  while (true) {
+    c = buff[pos];
+    for (int i = bit_pos; i != -1; --i) {
+      if ((c << i) & FIRST_BIT) {
+        return index;
+      }
+      --index;
+    }
+    --pos;
+    bit_pos = 7;
+  }
+  return index;
+}
+
+int binary_select_bb(int pre_1_pos, int start, int end,
+                     const std::unique_ptr<int32_t[]>& select_table,
+                     const std::unique_ptr<char[]>& buff) {
+  int mid = 0, select_index = 0;
+  // pre_1_pos is index of c_table
+  while (true) {
+    if (start > end) break;
+    mid = (start + end) / 2;
+    select_index = Select_Sm(mid, select_table, buff);
+    if (select_index == pre_1_pos) {
+      return mid;
+    } else if (select_index > pre_1_pos) {
+      end = mid - 1;
+    } else {
+      start = mid + 1;
+    }
+  }
+  return -1;
+}
+
+int RLEBWT::search_n_sm(std::unique_ptr<char[]>& result) {
+  ++len_of_pattern_;
+  search_pattern_[len_of_pattern_ - 1] = ']';
+  int c = ']', curr_index = 0, count = 0,
+      max_index = c_table_[NUMBER_OF_CHAR - 1];
+  auto reverse_map = std::make_unique<int32_t[]>(num_of_char_);
+  for (int i = 0; i != NUMBER_OF_CHAR; ++i) {
+    if (mapping_table_[i] != -1) {
+      reverse_map[mapping_table_[i]] = i;
+    }
+  }
+  int occurrence_1 = 0, occurrence_2 = 0;
+  int search_index = len_of_pattern_ - 1, padding_0_1 = 0, padding_0_2 = 0,
+      pre_lower = 0, pre_upper = 0, upper_index = 0, lower_index = 0,
+      lower_bound = c_table_[']' - 1], upper_bound = c_table_[']'] - 1;
+  while (search_index > -1) {
+    if (--search_index == -1) {
+      c = '[';
+    } else {
+      c = search_pattern_[search_index];
+    }
+    pre_lower = lower_bound;
+    pre_upper = upper_bound;
+    lower_index = rank_sm_function(b_f_buff_, occ_b_table_, lower_bound + 1);
+    upper_index = rank_sm_function(b_f_buff_, occ_b_table_, upper_bound + 1);
+    occurrence_1 = Occ_Function_Sm(c, lower_index - 1, occ_s_table_, s_f_buff_,
+                                   mapping_table_, num_of_char_, step_s_size_);
+    occurrence_2 = Occ_Function_Sm(c, upper_index, occ_s_table_, s_f_buff_,
+                                   mapping_table_, num_of_char_, step_s_size_);
+    lower_bound = c_s_table_[c - 1] + occurrence_1 + 1;
+    upper_bound = c_s_table_[c - 1] + occurrence_2;
+    if (lower_bound > upper_bound) {
+      return -1;
+    }
+    padding_0_1 =
+        (s_f_buff_[lower_index - 1] == c)
+            ? pre_lower - Select_Sm(lower_index, select_b_table_, b_f_buff_)
+            : 0;
+    padding_0_2 =
+        (s_f_buff_[upper_index - 1] == c)
+            ? pre_upper - Select_Sm(upper_index, select_b_table_, b_f_buff_)
+            : 0;
+    if (s_f_buff_[lower_index - 1] != c) {
+      lower_bound = Select_Sm(lower_bound, select_bb_table_, bb_f_buff_);
+    } else {
+      lower_bound =
+          Select_Sm(lower_bound, select_bb_table_, bb_f_buff_) + padding_0_1;
+    }
+    if (s_f_buff_[upper_index - 1] != c) {
+      if (upper_bound == static_cast<int>(s_f_size_)) {
+        upper_bound = max_index - 1;
+      } else {
+        upper_bound =
+            Select_Sm(upper_bound + 1, select_bb_table_, bb_f_buff_) - 1;
+      }
+    } else {
+      upper_bound =
+          Select_Sm(upper_bound, select_bb_table_, bb_f_buff_) + padding_0_2;
+    }
+    if (c == '[') {
+      curr_index = lower_bound;
+      // std::cout << static_cast<char>(c) << '\n';
+      break;
+    }
+  }
+  // start forward search
+  int pre_i_th_1 = 0, pos_c = 0, pos_s_1 = 0, record = false;
+  // int pre_1_pos = 0;
+  while (true) {
+    pre_i_th_1 = rank_sm_function(bb_f_buff_, occ_bb_table_, curr_index + 1);
+    // for no select table
+    // pre_1_pos = find_pre_1(curr_index, bb_f_buff_);
+    // pre_i_th_1 = binary_select_bb(pre_1_pos, c_s_table_[c - 1] + 1,
+    //                               c_s_table_[c], select_bb_table_,
+    //                               bb_f_buff_);
+    if (pre_i_th_1 == -1) return -1;
+    padding_0_1 =
+        curr_index - Select_Sm(pre_i_th_1, select_bb_table_, bb_f_buff_);
+    pos_c = pre_i_th_1 - c_s_table_[c - 1];
+    pos_s_1 = binary_search_s_sm(pos_c, c);
+    if (pos_s_1 == -1) return -1;
+    curr_index = Select_Sm(pos_s_1, select_b_table_, b_f_buff_) + padding_0_1;
+    c = binary_search_char(curr_index, num_of_char_, c_table_, reverse_map);
+    if (c == ']') {
+      record = true;
+    } else if (c == '[') {
+      break;
+    } else if (record) {
+      result[count] = c;
+      ++count;
+    }
+  }
+  return count;
+}
+
 void RLEBWT::Search_Sm() {
   if (mode == 'm') {
     std::cout << search_m_sm() << '\n';
   } else if (mode == 'a') {
+    auto results = std::make_unique<size_t[]>(MAX_RESULT_NUM);
+    auto count = search_a_sm(results);
+    for (int i = 0; i != count; ++i) {
+      std::cout << '[' << results[i] << ']' << '\n';
+    }
   } else if (mode == 'r') {
+    std::cout << search_r_sm() << '\n';
   } else if (mode == 'n') {
+    auto result = std::make_unique<char[]>(MAX_SEARCH_PATTERN_LEN);
+    auto count = search_n_sm(result);
+    if (count == -1) {
+      return;
+    }
+    for (int i = 0; i != count; ++i) {
+      std::cout << result[i];
+    }
+    std::cout << '\n';
   } else {
     std::cerr << "Invalid search flag.\n";
   }
