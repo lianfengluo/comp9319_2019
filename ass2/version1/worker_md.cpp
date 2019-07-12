@@ -1,6 +1,6 @@
 #include "worker.h"
 
-int find_pre_1(int index, const MyArray<char>& buff) {
+int find_pre_1(int index, const std::unique_ptr<char[]>& buff) {
   int pos = index / 8;
   int bit_pos = index % 8;
   int c = 0;
@@ -19,8 +19,8 @@ int find_pre_1(int index, const MyArray<char>& buff) {
 }
 
 static int binary_select_bb(int pre_1_pos, int start, int end,
-                            const MyArray<int32_t>& select_table,
-                            const MyArray<char>& buff, int interval) {
+                            const std::unique_ptr<int32_t[]>& select_table,
+                            const std::unique_ptr<char[]>& buff, int interval) {
   int mid = 0, select_index = 0;
   // pre_1_pos is index of c_table
   while (true) {
@@ -38,12 +38,12 @@ static int binary_select_bb(int pre_1_pos, int start, int end,
   return -1;
 }
 
-int RLEBWT::search_n_md(MyArray<char>& result) {
+int RLEBWT::search_n_md(std::unique_ptr<char[]>& result) {
   ++len_of_pattern_;
   search_pattern_[len_of_pattern_ - 1] = ']';
   int c = ']', curr_index = 0, count = 0,
       max_index = c_table_[NUMBER_OF_CHAR - 1];
-  MyArray<int32_t> reverse_map = new int32_t[num_of_char_];
+  auto reverse_map = std::make_unique<int32_t[]>(num_of_char_);
   for (int i = 0; i != NUMBER_OF_CHAR; ++i) {
     if (mapping_table_[i] != -1) {
       reverse_map[mapping_table_[i]] = i;
@@ -107,6 +107,7 @@ int RLEBWT::search_n_md(MyArray<char>& result) {
     }
     if (c == '[') {
       curr_index = lower_bound;
+      // std::cout << static_cast<char>(c) << '\n';
       break;
     }
   }
@@ -213,6 +214,7 @@ int RLEBWT::search_r_md() {
   if (upper_bound >= lower_bound) {
     int occ = 0, curr_index = 0, padding = 0, cc = 0;
     int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
+    // std::cout << lower_bound << ' ' << upper_bound << '\n';
     for (int i = lower_bound; i <= upper_bound; ++i) {
       curr_index = i;
       while (true) {
@@ -253,7 +255,7 @@ int RLEBWT::search_r_md() {
   return count;
 }
 
-int RLEBWT::search_a_md(MyArray<size_t>& results) {
+int RLEBWT::search_a_md(std::unique_ptr<size_t[]>& results) {
   int c = search_pattern_[len_of_pattern_ - 1], count = 0;
   int lower_bound = c_table_[c - 1], upper_bound = c_table_[c] - 1;
   get_lower_uppder_bound_md(lower_bound, upper_bound, c);
@@ -276,7 +278,7 @@ int RLEBWT::search_a_md(MyArray<size_t>& results) {
           break;
         }
         if (record) {
-          result += (cc - '0') * static_cast<size_t>(pow(10, result_len));
+          result += (cc - '0') * static_cast<size_t>(std::powl(10, result_len));
           ++result_len;
         }
         if (cc == ']') {
@@ -308,7 +310,7 @@ int RLEBWT::search_a_md(MyArray<size_t>& results) {
       }
     }
   }
-  qsort(results.get(), count, sizeof(size_t), Compare);
+  std::sort(results.get(), results.get() + count);
   return count;
 }
 
@@ -333,70 +335,67 @@ void RLEBWT::Search_Medium() {
   const auto b_i_f_n = index_folder_ + "/" + filename_ + ".b";
   const auto bs_i_f_n = index_folder_ + "/" + filename_ + ".bs";
   const auto bb_i_f_n = index_folder_ + "/" + filename_ + ".bb";
-  lseek(s_f_, 0, SEEK_SET);
-  lseek(b_f_, 0, SEEK_SET);
-  lseek(bb_f_, 0, SEEK_SET);
-  s_f_buff_ = new char[s_f_size_];
+  s_f_buff_ = std::make_unique<char[]>(s_f_size_);
   read(s_f_, s_f_buff_.get(), s_f_size_);
-  b_f_buff_ = new char[b_f_size_];
+  b_f_buff_ = std::make_unique<char[]>(b_f_size_);
   read(b_f_, b_f_buff_.get(), b_f_size_);
-  bb_f_buff_ = new char[b_f_size_];
+  bb_f_buff_ = std::make_unique<char[]>(b_f_size_);
   read(bb_f_, bb_f_buff_.get(), b_f_size_);
   int s_i_f = open(s_i_f_n.c_str(), O_RDONLY);
   int s_i_f_size = lseek(s_i_f, 0, SEEK_END);
   lseek(s_i_f, 0, SEEK_SET);
-  occ_s_table_ = new int32_t[s_i_f_size / 4];
+  occ_s_table_ = std::make_unique<int32_t[]>(s_i_f_size / 4);
   read(s_i_f, occ_s_table_.get(), s_i_f_size);
   int b_i_f = open(b_i_f_n.c_str(), O_RDONLY);
   int b_i_f_size = lseek(b_i_f, 0, SEEK_END);
   lseek(b_i_f, 0, SEEK_SET);
-  occ_b_table_ = new int32_t[b_i_f_size / 4];
+  occ_b_table_ = std::make_unique<int32_t[]>(b_i_f_size / 4);
   read(b_i_f, occ_b_table_.get(), b_i_f_size);
   int bs_i_f = open(bs_i_f_n.c_str(), O_RDONLY);
   int bs_i_f_size = lseek(bs_i_f, 0, SEEK_END);
-  select_b_table_ = new int32_t[bs_i_f_size / 4];
+  select_b_table_ = std::make_unique<int32_t[]>(bs_i_f_size / 4);
   lseek(bs_i_f, 0, SEEK_SET);
   read(bs_i_f, select_b_table_.get(), bs_i_f_size);
   int bb_i_f = open(bb_i_f_n.c_str(), O_RDONLY);
   int bb_i_f_size = lseek(bb_i_f, 0, SEEK_END);
   lseek(bb_i_f, 0, SEEK_SET);
-  select_bb_table_ = new int32_t[bb_i_f_size / 4];
+  select_bb_table_ = std::make_unique<int32_t[]>(bb_i_f_size / 4);
   read(bb_i_f, select_bb_table_.get(), bb_i_f_size);
   close(s_i_f);
   close(b_i_f);
   close(bs_i_f);
   close(bb_i_f);
   // interval getting
-  interval_b_ = ((s_f_size_ * 4 - 1) / (b_f_size_ / 2) + 1);
-  interval_bb_ = ((s_f_size_ * 4 - 1) / (b_f_size_) + 1);
+  interval_b_ = std::ceil(static_cast<double>(s_f_size_) / (b_f_size_ / 2) * 4);
+  interval_bb_ = std::ceil(static_cast<double>(s_f_size_) / b_f_size_ * 4);
   int chunk_size = sizeof(int32_t) * num_of_char_;
   int max_chunks_nums = (s_f_size_ - 2 * CHUNK_SIZE) / chunk_size;
   if (max_chunks_nums > 0) {
-    step_s_size_ = ((s_f_size_ - 1) / max_chunks_nums + 1);
+    step_s_size_ = std::ceil(static_cast<double>(s_f_size_) / max_chunks_nums);
   } else {
     step_s_size_ = s_f_size_ + 1;
   }
   if (mode == 'm') {
-    printf("%d\n", search_m_md());
+    std::cout << search_m_md() << '\n';
   } else if (mode == 'a') {
-    MyArray<size_t> results = new size_t[MAX_RESULT_NUM];
+    auto results = std::make_unique<size_t[]>(MAX_RESULT_NUM);
     auto count = search_a_md(results);
     for (int i = 0; i != count; ++i) {
-      printf("[%zu]\n", results[i]);
+      std::cout << '[' << results[i] << ']' << '\n';
     }
   } else if (mode == 'r') {
-    printf("%d\n", search_r_md());
+    std::cout << search_r_md() << '\n';
   } else if (mode == 'n') {
-    MyArray<char> result = new char[MAX_SEARCH_PATTERN_LEN];
+    auto result = std::make_unique<char[]>(MAX_SEARCH_PATTERN_LEN);
     auto count = search_n_md(result);
     if (count == -1) {
       return;
     }
     for (int i = 0; i != count; ++i) {
-      putchar(result[i]);
+      std::cout << result[i];
     }
-    putchar('\n');
+    std::cout << '\n';
   } else {
-    fprintf(stderr, "Invalid search flag.\n");
+    std::cerr << "Invalid search flag.\n";
   }
 }

@@ -1,16 +1,11 @@
-#include <fcntl.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <cstring>
+#include <iostream>
 
 #include "worker.h"
 
 int main(int argc, char *argv[]) {
   if (argc != 5 || strlen(argv[1]) != 2) {
-    exit(1);
+    std::exit(1);
   }
   RLEBWT rlebwt_worker{argv};
   rlebwt_worker.Build_S_B_Index();

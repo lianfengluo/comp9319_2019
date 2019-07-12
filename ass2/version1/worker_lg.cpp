@@ -2,8 +2,8 @@
 
 const int STEP_LG_B = 8;
 
-static int rank_lg_function(const MyArray<char>& buff,
-                            const MyArray<int32_t>& occ, int index,
+static int rank_lg_function(const std::unique_ptr<char[]>& buff,
+                            const std::unique_ptr<int32_t[]>& occ, int index,
                             int step_record, bool load_occ, bool load_f,
                             int b_f, int b_f_i) {
   // bit position, every 32 bits(4 byte * 8) get one record;
@@ -44,8 +44,8 @@ static int rank_lg_function(const MyArray<char>& buff,
       }
     } else {
       lseek(b_f, b_start_byte_pos, SEEK_SET);
-      char buff2[STEP_LG_B] = {'\0'};
-      read(b_f, buff2, STEP_LG_B);
+      std::array<char, STEP_LG_B> buff2{'\0'};
+      read(b_f, buff2.data(), STEP_LG_B);
       for (int j = 0; j != STEP_LG_B; ++j) {
         byte = buff2[j];
         if (b_start_byte_pos + j == end_b_byte_pos) {
@@ -68,11 +68,11 @@ static int rank_lg_function(const MyArray<char>& buff,
   return occ_b;
 }
 
-int Occ_Function_Lg(int c, int index_s, const MyArray<int32_t>& occ,
-                    const MyArray<char>& buff,
-                    const MyArray<int32_t>& map_table, int num_of_char,
-                    int step_size, bool load_s, bool load_r_s, int s_f,
-                    int s_f_i) {
+int Occ_Function_Lg(int c, int index_s, const std::unique_ptr<int32_t[]>& occ,
+                    const std::unique_ptr<char[]>& buff,
+                    const std::unique_ptr<int32_t[]>& map_table,
+                    int num_of_char, int step_size, bool load_s, bool load_r_s,
+                    int s_f, int s_f_i) {
   int chunk_s_location = index_s / step_size;
   int occ_s = 0;
   int start_s_place = 0;
@@ -93,8 +93,8 @@ int Occ_Function_Lg(int c, int index_s, const MyArray<int32_t>& occ,
       }
     } else {
       lseek(s_f, start_s_place, SEEK_SET);
-      char buff2[CHUNK_SIZE] = {'\0'};
-      read(s_f, buff2, CHUNK_SIZE);
+      std::array<char, CHUNK_SIZE> buff2{'\0'};
+      read(s_f, buff2.data(), CHUNK_SIZE);
       int end = index_s - start_s_place;
       for (int i = 0; i < end; ++i) {
         if (buff2[i] == c) ++occ_s;
@@ -104,9 +104,9 @@ int Occ_Function_Lg(int c, int index_s, const MyArray<int32_t>& occ,
   return occ_s;
 }
 
-static int Select_Lg(int index, const MyArray<int32_t>& select_table,
-                     const MyArray<char>& f_buff, int interval, bool load_f,
-                     bool load_i_f, int file, int index_file) {
+static int Select_Lg(int index, const std::unique_ptr<int[]>& select_table,
+                     const std::unique_ptr<char[]>& f_buff, int interval,
+                     bool load_f, bool load_i_f, int file, int index_file) {
   int pos = index / interval;
   int rest_of_1 = index % interval;
   int bit_index = 0, byte = 0;
@@ -133,8 +133,8 @@ static int Select_Lg(int index, const MyArray<int32_t>& select_table,
       }
     } else {
       lseek(file, 0, SEEK_SET);
-      char r_buff[MIN_READ_BUFF];
-      read(file, r_buff, MIN_READ_BUFF);
+      std::array<char, MIN_READ_BUFF> r_buff;
+      read(file, r_buff.data(), MIN_READ_BUFF);
       while (true) {
         byte = r_buff[start];
         for (int i = 0; i != 8; ++i) {
@@ -147,7 +147,7 @@ static int Select_Lg(int index, const MyArray<int32_t>& select_table,
         ++start;
         if (start == MIN_READ_BUFF) {
           start = 0;
-          read(file, r_buff, MIN_READ_BUFF);
+          read(file, r_buff.data(), MIN_READ_BUFF);
         }
       }
     }
@@ -172,8 +172,8 @@ static int Select_Lg(int index, const MyArray<int32_t>& select_table,
     }
   } else {
     lseek(file, start, SEEK_SET);
-    char r_buff[MIN_READ_BUFF];
-    read(file, r_buff, MIN_READ_BUFF);
+    std::array<char, MIN_READ_BUFF> r_buff;
+    read(file, r_buff.data(), MIN_READ_BUFF);
     start = 0;
     while (true) {
       byte = r_buff[start];
@@ -188,7 +188,7 @@ static int Select_Lg(int index, const MyArray<int32_t>& select_table,
       start_bit = 0;
       if (start == MIN_READ_BUFF) {
         start = 0;
-        read(file, r_buff, MIN_READ_BUFF);
+        read(file, r_buff.data(), MIN_READ_BUFF);
       }
     }
   }
@@ -286,7 +286,7 @@ void RLEBWT::get_lower_uppder_bound_lg(int& lower_bound, int& upper_bound,
   }
 }
 
-int RLEBWT::search_a_lg(MyArray<size_t>& results) {
+int RLEBWT::search_a_lg(std::unique_ptr<size_t[]>& results) {
   int c = search_pattern_[len_of_pattern_ - 1], count = 0;
   int lower_bound = c_table_[c - 1], upper_bound = c_table_[c] - 1;
   get_lower_uppder_bound_lg(lower_bound, upper_bound, c);
@@ -315,7 +315,7 @@ int RLEBWT::search_a_lg(MyArray<size_t>& results) {
           break;
         }
         if (record) {
-          result += (cc - '0') * static_cast<size_t>(pow(10, result_len));
+          result += (cc - '0') * static_cast<size_t>(std::powl(10, result_len));
           ++result_len;
         }
         if (cc == ']') {
@@ -368,7 +368,7 @@ int RLEBWT::search_a_lg(MyArray<size_t>& results) {
       }
     }
   }
-  qsort(results.get(), count, sizeof(size_t), Compare);
+  std::sort(results.get(), results.get() + count);
   return count;
 }
 
@@ -387,10 +387,16 @@ int RLEBWT::search_r_lg() {
         rank_index = rank_lg_function(b_f_buff_, occ_b_table_, curr_index + 1,
                                       8, load_r_b_, load_b_, b_f_, b_i_f_);
         if (load_s_) {
-          cc = s_f_buff_[rank_index - 1];
+          index_want = (s_f_buff_[rank_index - 1] == cc);
         } else {
+          char temp_c = 0;
           lseek(s_f_, rank_index - 1, SEEK_SET);
-          read(s_f_, &cc, 1);
+          read(s_f_, &temp_c, 1);
+          if (temp_c == cc) {
+            index_want = true;
+          } else {
+            index_want = false;
+          }
         }
         if (cc == ']') {
           ++count;
@@ -482,10 +488,10 @@ static int find_pre_1_lg(int index, int bb_f) {
 }
 
 static int binary_select_bb_lg(int pre_1_pos, int start, int end,
-                               const MyArray<int32_t>& select_table,
-                               const MyArray<char>& buff, int interval,
-                               bool load_bb, bool load_bb_i, int bb_f,
-                               int bb_i_f) {
+                               const std::unique_ptr<int32_t[]>& select_table,
+                               const std::unique_ptr<char[]>& buff,
+                               int interval, bool load_bb, bool load_bb_i,
+                               int bb_f, int bb_i_f) {
   int mid = 0, select_index = 0;
   // pre_1_pos is index of c_table
   while (true) {
@@ -538,12 +544,12 @@ int RLEBWT::binary_search_lg(int pos_c, int c) {
   return -1;
 }
 
-int RLEBWT::search_n_lg(MyArray<char>& result) {
+int RLEBWT::search_n_lg(std::unique_ptr<char[]>& result) {
   ++len_of_pattern_;
   search_pattern_[len_of_pattern_ - 1] = ']';
   int c = ']', curr_index = 0, count = 0,
       max_index = c_table_[NUMBER_OF_CHAR - 1];
-  MyArray<int32_t> reverse_map = new int32_t[num_of_char_];
+  auto reverse_map = std::make_unique<int32_t[]>(num_of_char_);
   for (int i = 0; i != NUMBER_OF_CHAR; ++i) {
     if (mapping_table_[i] != -1) {
       reverse_map[mapping_table_[i]] = i;
@@ -697,14 +703,11 @@ void RLEBWT::Search_Lg() {
     num_of_char_ = count;
   }
   // int free_space = MAX_FREE_MEMORY;
-  int free_space = MAX_FREE_MEMORY;
+  int free_space = MAX_FREE_MEMORY + 6 * 1024 * 1024;
   const auto s_i_f_name = index_folder_ + "/" + filename_ + ".s";
   const auto b_i_f_name = index_folder_ + "/" + filename_ + ".b";
   const auto bs_i_f_name = index_folder_ + "/" + filename_ + ".bs";
   const auto bb_i_f_name = index_folder_ + "/" + filename_ + ".bb";
-  lseek(s_f_, 0, SEEK_SET);
-  lseek(b_f_, 0, SEEK_SET);
-  lseek(bb_f_, 0, SEEK_SET);
   s_i_f_ = open(s_i_f_name.c_str(), O_RDONLY);
   int s_i_f_size = lseek(s_i_f_, 0, SEEK_END);
   lseek(s_i_f_, 0, SEEK_SET);
@@ -718,7 +721,7 @@ void RLEBWT::Search_Lg() {
   int bb_i_f_size = lseek(bb_i_f_, 0, SEEK_END);
   lseek(bb_i_f_, 0, SEEK_SET);
   if (free_space >= static_cast<int>(b_f_size_)) {
-    bb_f_buff_ = new char[b_f_size_];
+    bb_f_buff_ = std::make_unique<char[]>(b_f_size_);
     free_space -= b_f_size_;
     read(bb_f_, bb_f_buff_.get(), b_f_size_);
     load_bb_ = true;
@@ -727,56 +730,59 @@ void RLEBWT::Search_Lg() {
     // if it's a n mode load bb index first
     if (free_space >= static_cast<int>(bb_i_f_size)) {
       free_space -= bb_i_f_size;
-      select_bb_table_ = new int32_t[bb_i_f_size / 4];
+      select_bb_table_ = std::make_unique<int32_t[]>(bb_i_f_size / 4);
       read(bb_i_f_, select_bb_table_.get(), bb_i_f_size);
       load_s_bb_ = true;
     }
     if (free_space >= static_cast<int>(b_f_size_)) {
       free_space -= b_f_size_;
-      b_f_buff_ = new char[b_f_size_];
+      b_f_buff_ = std::make_unique<char[]>(b_f_size_);
       read(b_f_, b_f_buff_.get(), b_f_size_);
       load_b_ = true;
     }
   } else {
     if (free_space >= static_cast<int>(b_f_size_)) {
       free_space -= b_f_size_;
-      b_f_buff_ = new char[b_f_size_];
+      b_f_buff_ = std::make_unique<char[]>(b_f_size_);
       read(b_f_, b_f_buff_.get(), b_f_size_);
       load_b_ = true;
     }
     if (free_space >= static_cast<int>(bb_i_f_size)) {
       free_space -= bb_i_f_size;
-      select_bb_table_ = new int32_t[bb_i_f_size / 4];
+      select_bb_table_ = std::make_unique<int32_t[]>(bb_i_f_size / 4);
       read(bb_i_f_, select_bb_table_.get(), bb_i_f_size);
       load_s_bb_ = true;
     }
   }
   if (free_space >= static_cast<int>(b_i_f_size)) {
     free_space -= b_i_f_size;
-    occ_b_table_ = new int32_t[b_i_f_size / 4];
+    occ_b_table_ = std::make_unique<int32_t[]>(b_i_f_size / 4);
     read(b_i_f_, occ_b_table_.get(), b_i_f_size);
     load_r_b_ = true;
   }
   if (free_space >= static_cast<int>(bs_i_f_size)) {
     free_space -= bs_i_f_size;
-    select_b_table_ = new int32_t[bs_i_f_size / 4];
+    select_b_table_ = std::make_unique<int32_t[]>(bs_i_f_size / 4);
     read(bs_i_f_, select_b_table_.get(), bs_i_f_size);
     load_s_b_ = true;
   }
   if (free_space >= static_cast<int>(s_f_size_)) {
     free_space -= s_f_size_;
-    s_f_buff_ = new char[s_f_size_];
+    s_f_buff_ = std::make_unique<char[]>(s_f_size_);
     read(s_f_, s_f_buff_.get(), s_f_size_);
     load_s_ = true;
   }
   if (free_space >= static_cast<int>(s_i_f_size)) {
     free_space -= s_i_f_size;
-    occ_s_table_ = new int32_t[s_i_f_size / 4];
+    occ_s_table_ = std::make_unique<int32_t[]>(s_i_f_size / 4);
     read(s_i_f_, occ_s_table_.get(), s_i_f_size);
     load_r_s_ = true;
   }
   ////////// load all the stuff in memory
   // interval getting
+  // 1 + ((x - 1) / y)
+  // interval_b_ = std::ceil(static_cast<double>(s_f_size_) / (b_f_size_ / 2) *
+  // 4);
   interval_b_ = 1 + ((s_f_size_ * 4 - 1) / (b_f_size_ / 2));
   interval_bb_ = 1 + ((s_f_size_ * 4 - 1) / b_f_size_);
   int chunk_size = sizeof(int32_t) * num_of_char_;
@@ -787,27 +793,27 @@ void RLEBWT::Search_Lg() {
     step_s_size_ = s_f_size_ + 1;
   }
   if (mode == 'm') {
-    printf("%d\n", search_m_lg());
+    std::cout << search_m_lg() << '\n';
   } else if (mode == 'a') {
-    MyArray<size_t> results = new size_t[MAX_RESULT_NUM];
+    auto results = std::make_unique<size_t[]>(MAX_RESULT_NUM);
     auto count = search_a_lg(results);
     for (int i = 0; i != count; ++i) {
-      printf("[%zu]\n", results[i]);
+      std::cout << '[' << results[i] << ']' << '\n';
     }
   } else if (mode == 'r') {
-    printf("%d\n", search_r_lg());
+    std::cout << search_r_lg() << '\n';
   } else if (mode == 'n') {
-    MyArray<char> result = new char[MAX_SEARCH_PATTERN_LEN];
+    auto result = std::make_unique<char[]>(MAX_SEARCH_PATTERN_LEN);
     auto count = search_n_lg(result);
     if (count == -1) {
       return;
     }
     for (int i = 0; i != count; ++i) {
-      putchar(result[i]);
+      std::cout << result[i];
     }
-    putchar('\n');
+    std::cout << '\n';
   } else {
-    fprintf(stderr, "Invalid search flag.\n");
+    std::cerr << "Invalid search flag.\n";
   }
   close(s_i_f_);
   close(b_i_f_);

@@ -1,10 +1,11 @@
 #include "worker.h"
 
 void RLEBWT::Build_BB_Index_SM() {
-  bb_f_buff_ = new char[b_f_size_];
+  bb_f_buff_ = std::make_unique<char[]>(b_f_size_);
   int write_pos = 0, bit_index = 0, num_of_1 = 0, c = 0, write_pos_bb = 0;
-  select_bb_table_ = new int[s_f_size_];
-  occ_bb_table_ = new int[(b_f_size_ - 1) / 4 + 1];
+  select_bb_table_ = std::make_unique<int32_t[]>(s_f_size_);
+  occ_bb_table_ = std::make_unique<int32_t[]>(
+      std::ceil(static_cast<double>(b_f_size_) / 4));
   int max = c_s_table_[NUMBER_OF_CHAR - 1], count_4 = 0;
   int readByte = read(bb_f_, bb_f_buff_.get(), b_f_size_);
   for (int i = 0; i != readByte; ++i) {
@@ -32,30 +33,27 @@ void RLEBWT::Build_BB_Index_SM() {
 }
 
 void RLEBWT::Build_S_B_Index_SM(int s_f, int b_f) {
-  if (s_f_size_ == 0) {
-    fprintf(stderr, "Input file is empty.");
-    return;
-  }
+  if (s_f_size_ == 0) throw std::runtime_error("Input file is empty.");
   // s_f: s_f_size + s_f_i: s_f_size + b_f, bb_f: 2 * b_f_size + o_b, o_bb: 2 *
   // b_f_size + select_b, select_bb: 2 * s_f_size
   int space_can_be_use = MAX_FREE_MEMORY - 4 * b_f_size_ - 4 * s_f_size_;
   int chunk_size = num_of_char_ * sizeof(int32_t);
   int max_chunks_nums = space_can_be_use / chunk_size;
-  int step_size = (s_f_size_ / max_chunks_nums == 0)
-                      ? 1
-                      : ((s_f_size_ - 1) / max_chunks_nums + 1);
+  int step_size =
+      (s_f_size_ / max_chunks_nums == 0)
+          ? 1
+          : (std::ceil(static_cast<double>(s_f_size_) / max_chunks_nums));
   step_s_size_ = step_size;
   int real_chunks_nums = s_f_size_ / step_size;
-  s_f_buff_ = new char[s_f_size_];
-  b_f_buff_ = new char[b_f_size_];
-  MyArray<int32_t> temp_table = new int32_t[num_of_char_];
-  for (int i = 0; i != num_of_char_; i++) {
-    temp_table[i] = 0;
-  }
-  occ_s_table_ = new int32_t[real_chunks_nums * num_of_char_];
-  occ_b_table_ = new int32_t[((b_f_size_ - 1) / 4) + 1];
+  s_f_buff_ = std::make_unique<char[]>(s_f_size_);
+  b_f_buff_ = std::make_unique<char[]>(b_f_size_);
+  auto temp_table = std::make_unique<int32_t[]>(num_of_char_);
+  std::fill(temp_table.get(), temp_table.get() + num_of_char_, 0);
+  occ_s_table_ = std::make_unique<int32_t[]>(real_chunks_nums * num_of_char_);
+  occ_b_table_ = std::make_unique<int32_t[]>(
+      std::ceil(static_cast<double>(b_f_size_) / 4));
   // every 4's 1 build the index
-  select_b_table_ = new int32_t[s_f_size_];
+  select_b_table_ = std::make_unique<int32_t[]>(s_f_size_);
   int s_index = 0, num_of_1 = 0, write_pos_b = 0, step_count = 0, write_pos = 0,
       count_4 = 0, bit_index = 0, write_pos_s_b = 0;
   int c = 0, byte = 0;
@@ -107,8 +105,8 @@ void RLEBWT::Build_S_B_Index_SM(int s_f, int b_f) {
   Sum_C_Table();
 }
 
-int Select_Sm_Md(int index, const MyArray<int32_t>& select_table,
-                 const MyArray<char>& f_buff, int interval) {
+int Select_Sm_Md(int index, const std::unique_ptr<int[]>& select_table,
+                 const std::unique_ptr<char[]>& f_buff, int interval) {
   int pos = index / interval;
   int rest_of_1 = index % interval;
   int bit_index = 0, byte = 0;
@@ -150,8 +148,9 @@ int Select_Sm_Md(int index, const MyArray<int32_t>& select_table,
   return bit_index;
 }
 
-int Rank_Sm_Md_Function(const MyArray<char>& buff, const MyArray<int32_t>& occ,
-                        int index, int step_record) {
+int Rank_Sm_Md_Function(const std::unique_ptr<char[]>& buff,
+                        const std::unique_ptr<int32_t[]>& occ, int index,
+                        int step_record) {
   // bit position, every 32 bits(4 byte * 8) get one record;
   const int step_bits = step_record * 8;
   int location_b_chunk = index / step_bits;
@@ -186,10 +185,11 @@ int Rank_Sm_Md_Function(const MyArray<char>& buff, const MyArray<int32_t>& occ,
   return occ_b;
 }
 
-int Occ_Function_Sm_Md(int c, int index_s, const MyArray<int32_t>& occ,
-                       const MyArray<char>& buff,
-                       const MyArray<int32_t>& map_table, int num_of_char,
-                       int step_size) {
+int Occ_Function_Sm_Md(int c, int index_s,
+                       const std::unique_ptr<int32_t[]>& occ,
+                       const std::unique_ptr<char[]>& buff,
+                       const std::unique_ptr<int32_t[]>& map_table,
+                       int num_of_char, int step_size) {
   int chunk_s_location = index_s / step_size;
   int occ_s = 0;
   int start_s_place = 0;
@@ -271,6 +271,7 @@ int RLEBWT::search_r_sm() {
   if (upper_bound >= lower_bound) {
     int occ = 0, curr_index = 0, padding = 0, cc = 0;
     int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
+    // std::cout << lower_bound << ' ' << upper_bound << '\n';
     for (int i = lower_bound; i <= upper_bound; ++i) {
       curr_index = i;
       while (true) {
@@ -309,7 +310,7 @@ int RLEBWT::search_r_sm() {
   return count;
 }
 
-int RLEBWT::search_a_sm(MyArray<size_t>& results) {
+int RLEBWT::search_a_sm(std::unique_ptr<size_t[]>& results) {
   int c = search_pattern_[len_of_pattern_ - 1], count = 0;
   int lower_bound = c_table_[c - 1], upper_bound = c_table_[c] - 1;
   get_lower_uppder_bound_sm(lower_bound, upper_bound, c);
@@ -332,7 +333,7 @@ int RLEBWT::search_a_sm(MyArray<size_t>& results) {
           break;
         }
         if (record) {
-          result += (cc - '0') * static_cast<size_t>(pow(10, result_len));
+          result += (cc - '0') * static_cast<size_t>(std::powl(10, result_len));
           ++result_len;
         }
         if (cc == ']') {
@@ -362,7 +363,7 @@ int RLEBWT::search_a_sm(MyArray<size_t>& results) {
       }
     }
   }
-  qsort(results.get(), count, sizeof(size_t), Compare);
+  std::sort(results.get(), results.get() + count);
   return count;
 }
 
@@ -388,12 +389,12 @@ int RLEBWT::binary_search_s_sm(int pos_c, int c) {
   return -1;
 }
 
-int RLEBWT::search_n_sm(MyArray<char>& result) {
+int RLEBWT::search_n_sm(std::unique_ptr<char[]>& result) {
   ++len_of_pattern_;
   search_pattern_[len_of_pattern_ - 1] = ']';
   int c = ']', curr_index = 0, count = 0,
       max_index = c_table_[NUMBER_OF_CHAR - 1];
-  MyArray<int32_t> reverse_map = new int32_t[num_of_char_];
+  auto reverse_map = std::make_unique<int32_t[]>(num_of_char_);
   for (int i = 0; i != NUMBER_OF_CHAR; ++i) {
     if (mapping_table_[i] != -1) {
       reverse_map[mapping_table_[i]] = i;
@@ -453,6 +454,7 @@ int RLEBWT::search_n_sm(MyArray<char>& result) {
     }
     if (c == '[') {
       curr_index = lower_bound;
+      // std::cout << static_cast<char>(c) << '\n';
       break;
     }
   }
@@ -485,26 +487,26 @@ int RLEBWT::search_n_sm(MyArray<char>& result) {
 
 void RLEBWT::Search_Sm() {
   if (mode == 'm') {
-    printf("%d\n", search_m_sm());
+    std::cout << search_m_sm() << '\n';
   } else if (mode == 'a') {
-    MyArray<size_t> results = new size_t[MAX_RESULT_NUM];
+    auto results = std::make_unique<size_t[]>(MAX_RESULT_NUM);
     auto count = search_a_sm(results);
     for (int i = 0; i != count; ++i) {
-      printf("[%zu]\n", results[i]);
+      std::cout << '[' << results[i] << ']' << '\n';
     }
   } else if (mode == 'r') {
-    printf("%d\n", search_r_sm());
+    std::cout << search_r_sm() << '\n';
   } else if (mode == 'n') {
-    MyArray<char> result = new char[MAX_SEARCH_PATTERN_LEN];
+    auto result = std::make_unique<char[]>(MAX_SEARCH_PATTERN_LEN);
     auto count = search_n_sm(result);
     if (count == -1) {
       return;
     }
     for (int i = 0; i != count; ++i) {
-      putchar(result[i]);
+      std::cout << result[i];
     }
-    putchar('\n');
+    std::cout << '\n';
   } else {
-    fprintf(stderr, "Invalid search flag.\n");
+    std::cerr << "Invalid search flag.\n";
   }
 }

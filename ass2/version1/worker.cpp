@@ -1,91 +1,19 @@
 #include "worker.h"
 
-String::String(const char* string) {
-  size_ = strlen(string);
-  buffer_ = new char[size_ + 1];
-  strcpy(buffer_, string);
-  buffer_[size_] = '\0';
-}
-
-String::String(const String& other) {
-  size_ = other.size();
-  buffer_ = new char[size_ + 1];
-  strcpy(buffer_, other.buffer_);
-  buffer_[size_] = '\0';
-}
-
-String& String::operator+=(const String& other) {
-  size_t len1 = size();
-  size_t len2 = other.size();
-  size_t len = len1 + len2;
-  char* new_buff = new char[len + 1];
-  new_buff[len] = '\0';
-  strcpy(new_buff, buffer_);
-  delete[] buffer_;
-  strcat(new_buff, other.buffer_);
-  buffer_ = new_buff;
-  size_ = len;
-  return *this;
-}
-
-String& String::operator+=(const char* other) {
-  size_t len1 = size();
-  size_t len2 = strlen(other);
-  size_t len = len1 + len2;
-  char* new_buff = new char[len + 1];
-  new_buff[len] = '\0';
-  strcpy(new_buff, buffer_);
-  delete[] buffer_;
-  strcat(new_buff, other);
-  buffer_ = new_buff;
-  size_ = len;
-  return *this;
-}
-
-String& String::operator=(const String& other) {
-  delete[] buffer_;
-  buffer_ = new char[other.size() + 1];
-  strcpy(buffer_, other.buffer_);
-  size_ = other.size();
-  buffer_[size_] = '\0';
-  return *this;
-}
-
-void String::resize(size_t size) {
-  delete[] buffer_;
-  buffer_ = new char[size + 1];
-  size_ = size;
-  buffer_[size] = '\0';
-}
-
-String::~String() { delete[] buffer_; }
-
-int64_t pow(int base, int power) {
-  int64_t result = 1;
-  for (int i = 0; i < power; ++i) {
-    result *= base;
-  }
-  return result;
-}
-
-int Compare(const void* a, const void* b) {
-  return (*(size_t*)a - *(size_t*)b);
-}
-
-static bool IsPathExist(const String& s) {
+static bool IsPathExist(const std::string& s) {
   struct stat buffer;
   return (stat(s.c_str(), &buffer) == 0);
 }
 
-static size_t fetch_new_bits(int file, MyArray<char>& r_buff2) {
+static size_t fetch_new_bits(int file, std::unique_ptr<char[]>& r_buff2) {
   return read(file, r_buff2.get(), READ_BUFF_SIZE);
 }
 
 RLEBWT::RLEBWT(char* argv[])
     : filepath_{argv[2]},
-      c_table_{new int32_t[NUMBER_OF_CHAR]},
-      c_s_table_{new int32_t[NUMBER_OF_CHAR]},
-      mapping_table_{new int32_t[NUMBER_OF_CHAR]} {
+      c_table_{std::make_unique<int32_t[]>(NUMBER_OF_CHAR)},
+      c_s_table_{std::make_unique<int32_t[]>(NUMBER_OF_CHAR)},
+      mapping_table_{std::make_unique<int32_t[]>(NUMBER_OF_CHAR)} {
   for (int j = 0; j != NUMBER_OF_CHAR; ++j) {
     c_table_[j] = 0;
     c_s_table_[j] = 0;
@@ -102,12 +30,14 @@ RLEBWT::RLEBWT(char* argv[])
   if (i == 0) {
     filename_ = filepath_;
   } else {
-    filename_.resize(filepath_.size() - (i + 1));
+    filename_.resize(filepath_.size() - (i + 1), ' ');
     for (size_t j = 0; j != filepath_.size() - (i + 1); ++j) {
       filename_[j] = filepath_[i + 1 + j];
     }
   }
-  String s_f_n{filepath_}, b_f_n{filepath_};
+  std::string s_f_n{filepath_}, b_f_n{filepath_};
+  s_f_n.reserve(s_f_n.size() + 4);
+  b_f_n.reserve(b_f_n.size() + 4);
   s_f_n += ".s";
   b_f_n += ".b";
   s_f_ = open(s_f_n.c_str(), O_RDONLY);
@@ -140,6 +70,7 @@ void RLEBWT::Sum_C_Table() {
 bool RLEBWT::Existsbb() {
   auto bb_f_name = filepath_ + ".bb";
   if (IsPathExist(bb_f_name)) {
+    // std::cout << "test\n";
     bb_f_ = open(bb_f_name.c_str(), O_RDONLY);
     return true;
   } else {
@@ -147,22 +78,20 @@ bool RLEBWT::Existsbb() {
   }
 }
 
-static void write_bb(MyArray<char>& w_buff, char r_s_buff[MIN_READ_BUFF],
-                     char r_b_buff[MIN_READ_BUFF], int bb_f, int s_f, int b_f,
-                     int64_t base, const MyArray<int32_t>& c_table, size_t size,
-                     size_t buff_size) {
-  int64_t max =
-      (8 * size - base > buff_size * 8) ? base + (buff_size * 8) : 8 * size;
-  bool processing_table[NUMBER_OF_CHAR];
-  int start_write[NUMBER_OF_CHAR];
-  int write_pos[NUMBER_OF_CHAR];
-  int count_c[NUMBER_OF_CHAR];
-  for (int i = 0; i != NUMBER_OF_CHAR; ++i) {
-    processing_table[i] = false;
-    count_c[i] = 0;
-    start_write[i] = 0;
-    write_pos[i] = 0;
-  }
+static void write_bb(std::unique_ptr<char[]>& w_buff,
+                     std::array<char, MIN_READ_BUFF>& r_s_buff,
+                     std::array<char, MIN_READ_BUFF>& r_b_buff, int bb_f,
+                     int s_f, int b_f, int base,
+                     const std::unique_ptr<int32_t[]>& c_table, size_t size) {
+  int max = (8 * size - base > MAX_FREE_BITS) ? base + MAX_FREE_BITS : 8 * size;
+  std::array<bool, NUMBER_OF_CHAR> processing_table;
+  std::array<int, NUMBER_OF_CHAR> start_write;
+  std::array<int64_t, NUMBER_OF_CHAR> write_pos;
+  std::array<int, NUMBER_OF_CHAR> count_c;
+  processing_table.fill(false);
+  count_c.fill(0);
+  start_write.fill(0);
+  write_pos.fill(0);
   // getting the char we need to consider
   for (int i = 1; i != NUMBER_OF_CHAR; ++i) {
     if (c_table[i - 1] == c_table[i]) {
@@ -177,19 +106,18 @@ static void write_bb(MyArray<char>& w_buff, char r_s_buff[MIN_READ_BUFF],
       }
     }
   }
-  int s_f_r = read(s_f, r_s_buff, MIN_READ_BUFF);
-  for (int i = 0; i != buff_size; ++i) {
-    w_buff[i] = -1;
-  }
+  int s_f_r = read(s_f, r_s_buff.data(), MIN_READ_BUFF);
+  // fill all the write buff to 1;
+  std::fill(w_buff.get(), w_buff.get() + MAX_FREE_MEMORY, -1);
   int readByte = 0;
   int c = 0, byte = 0;
   int s_index = 0, w_byte = 0, w_bit = 0;
   bool done = false;
   int bit_index = 0;
   const int writing_size =
-      (8 * size - base > buff_size * 8) ? buff_size : size - (base / 8);
-  const int64_t writing_size_bits = writing_size * 8;
-  while ((readByte = read(b_f, r_b_buff, MIN_READ_BUFF))) {
+      (8 * size - base > MAX_FREE_BITS) ? MAX_FREE_MEMORY : size - (base / 8);
+  const int writing_size_bits = writing_size * 8;
+  while ((readByte = read(b_f, r_b_buff.data(), MIN_READ_BUFF))) {
     for (int i = 0; i != readByte; ++i) {
       byte = r_b_buff[i];
       for (int j = 0; j != 8; ++j) {
@@ -229,7 +157,7 @@ static void write_bb(MyArray<char>& w_buff, char r_s_buff[MIN_READ_BUFF],
           }
           if (s_index == s_f_r) {
             s_index = 0;
-            s_f_r = read(s_f, r_s_buff, MIN_READ_BUFF);
+            s_f_r = read(s_f, r_s_buff.data(), MIN_READ_BUFF);
             if (s_f_r == 0) {
               done = true;
             }
@@ -245,23 +173,20 @@ static void write_bb(MyArray<char>& w_buff, char r_s_buff[MIN_READ_BUFF],
 void RLEBWT::Createbb() {
   const auto bb_f_n = filepath_ + ".bb";
   int bb_f = open(bb_f_n.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-  size_t buff_size =
-      (b_f_size_ > MAX_FREE_MEMORY) ? MAX_FREE_MEMORY : b_f_size_;
-  MyArray<char> w_buff = new char[buff_size];
-  char r_s_buff[MIN_READ_BUFF];
-  char r_b_buff[MIN_READ_BUFF];
-  int repeat = ((b_f_size_ - 1) / buff_size + 1);
-  int64_t base = 0;
-  lseek(s_f_, 0, SEEK_SET);
-  lseek(b_f_, 0, SEEK_SET);
+  // auto w_buff = std::make_unique<char[]>(MAX_FREE_MEMORY);
+  auto w_buff = std::make_unique<char[]>(MAX_FREE_MEMORY);
+  std::array<char, MIN_READ_BUFF> r_s_buff;
+  std::array<char, MIN_READ_BUFF> r_b_buff;
+  int repeat = std::ceil(static_cast<double>(b_f_size_) / MAX_FREE_MEMORY);
+  int base = 0;
   write_bb(w_buff, r_s_buff, r_b_buff, bb_f, s_f_, b_f_, base, c_table_,
-           b_f_size_, buff_size);
+           b_f_size_);
   for (int i = 1; i < repeat; ++i) {
     lseek(s_f_, 0, SEEK_SET);
     lseek(b_f_, 0, SEEK_SET);
     base += MAX_FREE_BITS;
     write_bb(w_buff, r_s_buff, r_b_buff, bb_f, s_f_, b_f_, base, c_table_,
-             b_f_size_, buff_size);
+             b_f_size_);
   }
   close(bb_f);
   bb_f_ = open(bb_f_n.c_str(), O_RDONLY);
@@ -272,7 +197,6 @@ void RLEBWT::Build_BB_Index() {
   // #ifndef DEBUG_
   if (IsPathExist(bb_i_f_name)) return;
   // #endif
-  lseek(bb_f_, 0, SEEK_SET);
   if (!large_file_) {
     Build_BB_Index_SM();
   } else {
@@ -281,14 +205,16 @@ void RLEBWT::Build_BB_Index() {
 }
 
 static void build_s_b_index(
-    MyArray<char>& r_buff, MyArray<char>& r_buff2, MyArray<int32_t>& c_table,
-    size_t size, MyArray<int32_t>& w_buff, MyArray<int32_t>& w_buff2,
+    std::unique_ptr<char[]>& r_buff, std::unique_ptr<char[]>& r_buff2,
+    std::unique_ptr<int32_t[]>& c_table, size_t size,
+    std::unique_ptr<int32_t[]>& w_buff, std::unique_ptr<int32_t[]>& w_buff2,
     int s_f_index_f, int b_f_index_f, int step_size, int& real_chunks_nums,
     int& write_pos, int s_f, size_t& s_index, int& num_of_1, int& write_pos_b,
     size_t& s_f_r, int& c, int& step_count,
-    const MyArray<int32_t>& mapping_table, int num_of_char,
-    MyArray<int32_t>& tmp_table, MyArray<int32_t>& w_buff3, int& write_pos_b_s,
-    int b_f_select_index_f, int interval, int& bit_index, int chunk_size) {
+    const std::unique_ptr<int32_t[]>& mapping_table, int num_of_char,
+    std::unique_ptr<int32_t[]>& tmp_table, std::unique_ptr<int32_t[]>& w_buff3,
+    int& write_pos_b_s, int b_f_select_index_f, int interval, int& bit_index,
+    int chunk_size) {
   int byte = 0;
   int count_8 = 0;
   bool done = false;
@@ -363,19 +289,20 @@ void RLEBWT::Build_S_B_Index_LG(int s_f, int b_f) {
       open(b_f_index_f_n.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
   int b_f_select_index_f =
       open(b_f_select_index_f_n.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-  const int interval = ((s_f_size_ * 4 - 1) / (b_f_size_ / 2) + 1);
+  const int interval =
+      std::ceil(static_cast<double>(s_f_size_) / (b_f_size_ / 2) * 4);
   int c_table_f = open(c_table_f_n.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
   int chunk_size = sizeof(int32_t) * num_of_char_;
-  MyArray<char> r_buff = new char[READ_BUFF_SIZE];
-  MyArray<char> r_buff2 = new char[READ_BUFF_SIZE];
-  MyArray<int32_t> w_buff = new int32_t[chunk_size * WRITE_NUM_OF_CHUNK];
-  MyArray<int32_t> w_buff2 = new int32_t[WRITE_BUFF_CHUNK];
-  MyArray<int32_t> w_buff3 = new int32_t[WRITE_BUFF_CHUNK];
+  auto r_buff = std::make_unique<char[]>(READ_BUFF_SIZE);
+  auto r_buff2 = std::make_unique<char[]>(READ_BUFF_SIZE);
+  auto w_buff = std::make_unique<int32_t[]>(chunk_size * WRITE_NUM_OF_CHUNK);
+  auto w_buff2 = std::make_unique<int32_t[]>(WRITE_BUFF_CHUNK);
+  auto w_buff3 = std::make_unique<int32_t[]>(WRITE_BUFF_CHUNK);
   // giving the chunk for the c_table and c_s_table. Therefore, I minus 2.
   int max_chunks_nums = (s_f_size_ - 2 * CHUNK_SIZE) / chunk_size;
   int step_size = 0, bit_index = 0;
   if (max_chunks_nums > 0) {
-    step_size = ((s_f_size_ - 1) / max_chunks_nums + 1);
+    step_size = std::ceil(static_cast<double>(s_f_size_) / max_chunks_nums);
   } else {
     step_size = s_f_size_ + 1;
   }
@@ -384,7 +311,7 @@ void RLEBWT::Build_S_B_Index_LG(int s_f, int b_f) {
       write_pos_b_s = 0;
   size_t s_f_r = fetch_new_bits(s_f, r_buff), s_index = 0;
   int c = 0;
-  MyArray<int32_t> temp_table = new int32_t[num_of_char_];
+  auto temp_table = std::make_unique<int32_t[]>(num_of_char_);
   while ((readByte = read(b_f, r_buff2.get(), READ_BUFF_SIZE))) {
     build_s_b_index(r_buff, r_buff2, c_table_, readByte, w_buff, w_buff2,
                     s_f_index_f, b_f_index_f, step_size, real_chunks_nums,
@@ -411,14 +338,14 @@ void RLEBWT::Build_S_B_Index_LG(int s_f, int b_f) {
   Sum_C_Table();
 }
 
-static void create_mapping(MyArray<int32_t>& mapping_table,
-                           MyArray<int32_t>& c_s_table, int s_f,
+static void create_mapping(std::unique_ptr<int32_t[]>& mapping_table,
+                           std::unique_ptr<int32_t[]>& c_s_table, int s_f,
                            int& num_of_char_) {
-  char r_buff[MIN_READ_BUFF];
+  std::array<char, MIN_READ_BUFF> r_buff;
   int readByte;
   int count = 0;
   int c;
-  while ((readByte = read(s_f, r_buff, MIN_READ_BUFF))) {
+  while ((readByte = read(s_f, r_buff.data(), MIN_READ_BUFF))) {
     for (int i = 0; i != readByte; ++i) {
       c = r_buff[i];
       ++c_s_table[c];
@@ -447,8 +374,8 @@ void RLEBWT::Build_S_B_Index() {
 }
 
 int binary_search_char(int index, int num_of_char,
-                       const MyArray<int32_t>& c_table,
-                       const MyArray<int32_t>& rev_map) {
+                       const std::unique_ptr<int32_t[]>& c_table,
+                       const std::unique_ptr<int32_t[]>& rev_map) {
   int start = 0, end = num_of_char - 1, mid = 0;
   while (true) {
     if (start > end) break;
@@ -472,12 +399,12 @@ int binary_search_char(int index, int num_of_char,
   return -1;
 }
 
-void RLEBWT::Build_BB_Index_LG(String& bb_i_f_name) {
+void RLEBWT::Build_BB_Index_LG(std::string& bb_i_f_name) {
   int bb_i_f = open(bb_i_f_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
   int readByte = 0;
-  MyArray<char> r_buff = new char[READ_BUFF_SIZE];
-  MyArray<int32_t> w_buff = new int32_t[WRITE_BUFF_CHUNK];
-  const int interval = ((s_f_size_ * 4 - 1) / (b_f_size_) + 1);
+  auto r_buff = std::make_unique<char[]>(READ_BUFF_SIZE);
+  auto w_buff = std::make_unique<int32_t[]>(WRITE_BUFF_CHUNK);
+  int interval = std::ceil(static_cast<double>(s_f_size_) / b_f_size_ * 4);
   int write_pos = 0, num_of_1 = 0, bit_index = 0;
   int c = 0;
   int max = c_s_table_[NUMBER_OF_CHAR - 1];
