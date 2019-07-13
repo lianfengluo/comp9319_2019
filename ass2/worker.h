@@ -25,12 +25,14 @@ const int START_UP_SIZE = 4.25 * 1024 * 1024;
 const int TOTAL_SPACE = 16 * 1024 * 1024;
 const int WRITE_NUM_OF_CHUNK = 2000;
 // 11.75MB
-const int MAX_FREE_MEMORY = TOTAL_SPACE - START_UP_SIZE;
+// const int MAX_FREE_MEMORY = TOTAL_SPACE - START_UP_SIZE;
+const int MAX_FREE_MEMORY = 1024 * 1024;
 const int MAX_FREE_BITS = MAX_FREE_MEMORY * 8;
 const int MAX_SEARCH_PATTERN_LEN = 5000;
 const int MAX_RESULT_NUM = 5000;
 const int FIRST_BIT = (1 << 7);
 const size_t MAX_LEN_SEARCH = 520;
+const int START_CHAR = 9;
 
 struct String {
   char* buffer_;
@@ -88,7 +90,7 @@ int Rank_Sm_Md_Function(const MyArray<char>& buff, const MyArray<int32_t>& occ,
 int Occ_Function_Sm_Md(int c, int index_s, const MyArray<int32_t>& occ,
                        const MyArray<char>& buff,
                        const MyArray<int32_t>& map_table, int num_of_char,
-                       int step_size);
+                       int step_size, size_t s_i_f_size);
 
 int binary_search_char(int index, int num_of_char,
                        const MyArray<int32_t>& c_table,
@@ -128,6 +130,7 @@ class RLEBWT {
   int bb_i_f_ = 0;
   size_t s_f_size_ = 0;
   size_t b_f_size_ = 0;
+  size_t s_i_f_size_ = 0;
   int num_of_char_ = 0;
   bool large_file_ = false;
   bool medium_file_ = false;

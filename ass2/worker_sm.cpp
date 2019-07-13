@@ -52,7 +52,8 @@ void RLEBWT::Build_S_B_Index_SM(int s_f, int b_f) {
   for (int i = 0; i != num_of_char_; i++) {
     temp_table[i] = 0;
   }
-  occ_s_table_ = new int32_t[real_chunks_nums * num_of_char_];
+  s_i_f_size_ = real_chunks_nums * num_of_char_;
+  occ_s_table_ = new int32_t[s_i_f_size_];
   occ_b_table_ = new int32_t[((b_f_size_ - 1) / 4) + 1];
   // every 4's 1 build the index
   select_b_table_ = new int32_t[s_f_size_];
@@ -189,12 +190,18 @@ int Rank_Sm_Md_Function(const MyArray<char>& buff, const MyArray<int32_t>& occ,
 int Occ_Function_Sm_Md(int c, int index_s, const MyArray<int32_t>& occ,
                        const MyArray<char>& buff,
                        const MyArray<int32_t>& map_table, int num_of_char,
-                       int step_size) {
+                       int step_size, size_t s_i_f_size) {
   int chunk_s_location = index_s / step_size;
   int occ_s = 0;
   int start_s_place = 0;
   if (chunk_s_location > 0) {
     occ_s = occ[(chunk_s_location - 1) * num_of_char + map_table[c]];
+    if (chunk_s_location * num_of_char + map_table[c] < s_i_f_size) {
+      int occ_s2 = occ[chunk_s_location * num_of_char + map_table[c]];
+      if (occ_s == occ_s2) {
+        return occ_s;
+      }
+    }
     start_s_place = chunk_s_location * step_size;
   }
   for (int i = start_s_place; i < index_s; ++i) {
@@ -217,12 +224,12 @@ void RLEBWT::get_lower_uppder_bound_sm(int& lower_bound, int& upper_bound,
         Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, lower_bound + 1, 4);
     upper_index =
         Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, upper_bound + 1, 4);
-    occurrence_1 =
-        Occ_Function_Sm_Md(c, lower_index - 1, occ_s_table_, s_f_buff_,
-                           mapping_table_, num_of_char_, step_s_size_);
-    occurrence_2 =
-        Occ_Function_Sm_Md(c, upper_index, occ_s_table_, s_f_buff_,
-                           mapping_table_, num_of_char_, step_s_size_);
+    occurrence_1 = Occ_Function_Sm_Md(c, lower_index - 1, occ_s_table_,
+                                      s_f_buff_, mapping_table_, num_of_char_,
+                                      step_s_size_, s_i_f_size_);
+    occurrence_2 = Occ_Function_Sm_Md(c, upper_index, occ_s_table_, s_f_buff_,
+                                      mapping_table_, num_of_char_,
+                                      step_s_size_, s_i_f_size_);
     lower_bound = c_s_table_[c - 1] + occurrence_1 + 1;
     upper_bound = c_s_table_[c - 1] + occurrence_2;
     if (lower_bound > upper_bound) {
@@ -283,7 +290,8 @@ int RLEBWT::search_r_sm() {
           break;
         }
         occ = Occ_Function_Sm_Md(cc, rank_index, occ_s_table_, s_f_buff_,
-                                 mapping_table_, num_of_char_, step_s_size_);
+                                 mapping_table_, num_of_char_, step_s_size_,
+                                 s_i_f_size_);
         curr_index = c_s_table_[cc - 1] + occ;
         padding = (s_f_buff_[rank_index - 1] == cc)
                       ? pre_index -
@@ -339,7 +347,8 @@ int RLEBWT::search_a_sm(MyArray<size_t>& results) {
           record = true;
         }
         occ = Occ_Function_Sm_Md(cc, rank_index, occ_s_table_, s_f_buff_,
-                                 mapping_table_, num_of_char_, step_s_size_);
+                                 mapping_table_, num_of_char_, step_s_size_,
+                                 s_i_f_size_);
         curr_index = c_s_table_[cc - 1] + occ;
         padding = (s_f_buff_[rank_index - 1] == cc)
                       ? pre_index -
@@ -367,12 +376,12 @@ int RLEBWT::search_a_sm(MyArray<size_t>& results) {
 }
 
 int RLEBWT::binary_search_s_sm(int pos_c, int c) {
-  int start = 1, end = s_f_size_, mid = 0, occ = 0;
+  int start = pos_c, end = s_f_size_, mid = 0, occ = 0;
   while (true) {
     mid = (start + end) / 2;
     if (start > end) return -1;
     occ = Occ_Function_Sm_Md(c, mid, occ_s_table_, s_f_buff_, mapping_table_,
-                             num_of_char_, step_s_size_);
+                             num_of_char_, step_s_size_, s_i_f_size_);
     if (occ == pos_c) {
       if (s_f_buff_[mid - 1] == c) {
         return mid;
@@ -415,12 +424,12 @@ int RLEBWT::search_n_sm(MyArray<char>& result) {
         Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, lower_bound + 1, 4);
     upper_index =
         Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, upper_bound + 1, 4);
-    occurrence_1 =
-        Occ_Function_Sm_Md(c, lower_index - 1, occ_s_table_, s_f_buff_,
-                           mapping_table_, num_of_char_, step_s_size_);
-    occurrence_2 =
-        Occ_Function_Sm_Md(c, upper_index, occ_s_table_, s_f_buff_,
-                           mapping_table_, num_of_char_, step_s_size_);
+    occurrence_1 = Occ_Function_Sm_Md(c, lower_index - 1, occ_s_table_,
+                                      s_f_buff_, mapping_table_, num_of_char_,
+                                      step_s_size_, s_i_f_size_);
+    occurrence_2 = Occ_Function_Sm_Md(c, upper_index, occ_s_table_, s_f_buff_,
+                                      mapping_table_, num_of_char_,
+                                      step_s_size_, s_i_f_size_);
     lower_bound = c_s_table_[c - 1] + occurrence_1 + 1;
     upper_bound = c_s_table_[c - 1] + occurrence_2;
     if (lower_bound > upper_bound) {
