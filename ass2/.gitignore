@@ -1,4 +1,0 @@
-*.o
-!*.cpp
-!*.h
-!makefile
