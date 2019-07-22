@@ -1,4 +1,6 @@
 *.o
+!ass1
+!ass2
 !ass2/*.cpp
 !ass2/*.h
 !ass2/makefile
