@@ -1,9 +1,8 @@
-*.o
+*
 !ass1
 !ass2
 !ass2/*.cpp
 !ass2/*.h
 !ass2/makefile
 ass2/my_a2
-ass2/version1
 !ass1/*.cpp
