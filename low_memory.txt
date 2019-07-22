@@ -1,0 +1,2 @@
+gcc sizeofptr.cpp -lsupc++ -lgcc_s -fno-rtti -fno-exceptions -lc -O3 -std=c++14
+-lsupc++ -lgcc_s -fno-rtti -fno-exceptions  -lc
