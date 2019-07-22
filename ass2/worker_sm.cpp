@@ -52,8 +52,8 @@ void RLEBWT::Build_S_B_Index_SM(int s_f, int b_f) {
   for (int i = 0; i != num_of_char_; i++) {
     temp_table[i] = 0;
   }
-  s_i_f_size_ = real_chunks_nums * num_of_char_;
-  occ_s_table_ = new int32_t[s_i_f_size_];
+  s_i_f_size_ = real_chunks_nums * num_of_char_ * 4;
+  occ_s_table_ = new int32_t[s_i_f_size_ / 4];
   occ_b_table_ = new int32_t[((b_f_size_ - 1) / 4) + 1];
   // every 4's 1 build the index
   select_b_table_ = new int32_t[s_f_size_];
@@ -196,7 +196,7 @@ int Occ_Function_Sm_Md(int c, int index_s, const MyArray<int32_t>& occ,
   int start_s_place = 0;
   if (chunk_s_location > 0) {
     occ_s = occ[(chunk_s_location - 1) * num_of_char + map_table[c]];
-    if (chunk_s_location * num_of_char + map_table[c] < s_i_f_size) {
+    if ((chunk_s_location * num_of_char + map_table[c]) * 4 < s_i_f_size) {
       int occ_s2 = occ[chunk_s_location * num_of_char + map_table[c]];
       if (occ_s == occ_s2) {
         return occ_s;

@@ -79,20 +79,22 @@ int Occ_Function_Lg(int c, int index_s, const MyArray<int32_t>& occ,
   if (chunk_s_location > 0) {
     if (load_r_s) {
       occ_s = occ[(chunk_s_location - 1) * num_of_char + map_table[c]];
-      if (chunk_s_location * num_of_char + map_table[c] < s_f_i_size) {
+      if ((chunk_s_location * num_of_char + map_table[c]) * 4 < s_f_i_size) {
         int occ_s2 = occ[chunk_s_location * num_of_char + map_table[c]];
         if (occ_s == occ_s2) return occ_s;
       }
     } else {
+      int32_t temp_buff[num_of_char + 1];
       lseek(s_f_i, ((chunk_s_location - 1) * num_of_char + map_table[c]) * 4,
             SEEK_SET);
-      read(s_f_i, &occ_s, 4);
-      if (chunk_s_location * num_of_char + map_table[c] < s_f_i_size) {
+      read(s_f_i, temp_buff, (num_of_char + 1) * 4);
+      if ((chunk_s_location * num_of_char + map_table[c]) * 4 < s_f_i_size) {
         int occ_s2 = 0;
-        lseek(s_f_i, (num_of_char - 1) * 4, SEEK_CUR);
-        read(s_f_i, &occ_s2, 4);
-        if (occ_s == occ_s2) return occ_s;
+        if (temp_buff[num_of_char] == temp_buff[0]) {
+          return temp_buff[0];
+        }
       }
+      occ_s = temp_buff[0];
     }
     start_s_place = chunk_s_location * step_size;
   }
@@ -551,9 +553,208 @@ int RLEBWT::binary_search_lg(int pos_c, int c) {
   return -1;
 }
 
-int RLEBWT::search_n_lg(MyArray<char>& result) {
+int RLEBWT::search_n_lg_back(MyArray<char>& result) {
+  char* endpoint;
+  size_t offset = strtoul(search_pattern_, &endpoint, 10);
+  for (int i = len_of_pattern_; i != 0; --i) {
+    search_pattern_[i] = search_pattern_[i - 1];
+  }
   ++len_of_pattern_;
-  search_pattern_[len_of_pattern_ - 1] = ']';
+  search_pattern_[0] = '[';
+  search_pattern_[len_of_pattern_] = ']';
+  int offset_lower_bound = c_table_[']' - 1],
+      offset_upper_bound = c_table_[']'] - 1;
+  ++len_of_pattern_;
+  get_lower_uppder_bound_lg(offset_lower_bound, offset_upper_bound, ']');
+  if (offset_lower_bound > offset_upper_bound) return -2;
+  int count = -1;
+  bool done = false;
+  for (int ii = 0; ii != 10; ++ii) {
+    ++offset;
+    char search_pattern[65] = {'\0'};
+    snprintf(search_pattern, 65, "%zu", offset);
+    int len_of_pattern = strlen(search_pattern);
+    search_pattern[len_of_pattern] = ']';
+    ++len_of_pattern;
+    int c = ']', curr_index = 0, max_index = c_table_[NUMBER_OF_CHAR - 1];
+    int occurrence_1 = 0, occurrence_2 = 0;
+    int search_index = len_of_pattern - 1, padding_0_1 = 0, padding_0_2 = 0,
+        pre_lower = 0, pre_upper = 0, upper_index = 0, lower_index = 0,
+        lower_bound = c_table_[']' - 1], upper_bound = c_table_[']'] - 1;
+    bool lower_want = false, upper_want = false;
+    while (search_index > -1) {
+      if (--search_index == -1) {
+        c = '[';
+      } else {
+        c = search_pattern[search_index];
+      }
+      pre_lower = lower_bound;
+      pre_upper = upper_bound;
+      lower_index = rank_lg_function(b_f_buff_, occ_b_table_, lower_bound + 1,
+                                     8, load_r_b_, load_b_, b_f_, b_i_f_);
+      upper_index = rank_lg_function(b_f_buff_, occ_b_table_, upper_bound + 1,
+                                     8, load_r_b_, load_b_, b_f_, b_i_f_);
+      if (load_s_ && load_r_s_) {
+        occurrence_1 = Occ_Function_Sm_Md(
+            c, lower_index - 1, occ_s_table_, s_f_buff_, mapping_table_,
+            num_of_char_, step_s_size_, s_i_f_size_);
+        occurrence_2 = Occ_Function_Sm_Md(
+            c, upper_index, occ_s_table_, s_f_buff_, mapping_table_,
+            num_of_char_, step_s_size_, s_i_f_size_);
+      } else {
+        occurrence_1 =
+            Occ_Function_Lg(c, lower_index - 1, occ_s_table_, s_f_buff_,
+                            mapping_table_, num_of_char_, step_s_size_, load_s_,
+                            load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+        occurrence_2 =
+            Occ_Function_Lg(c, upper_index, occ_s_table_, s_f_buff_,
+                            mapping_table_, num_of_char_, step_s_size_, load_s_,
+                            load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+      }
+      lower_bound = c_s_table_[c - 1] + occurrence_1 + 1;
+      upper_bound = c_s_table_[c - 1] + occurrence_2;
+      if (lower_bound > upper_bound) {
+        break;
+      }
+      if (!load_s_) {
+        int temp_c = '\0';
+        lseek(s_f_, upper_index - 1, SEEK_SET);
+        read(s_f_, &temp_c, 1);
+        if (temp_c == c) {
+          upper_want = true;
+        }
+        lseek(s_f_, lower_index - 1, SEEK_SET);
+        read(s_f_, &temp_c, 1);
+        if (temp_c == c) {
+          lower_want = true;
+        }
+      } else {
+        lower_want = (s_f_buff_[lower_index - 1] == c);
+        upper_want = (s_f_buff_[upper_index - 1] == c);
+      }
+      padding_0_1 = (lower_want)
+                        ? pre_lower - Select_Lg(lower_index, select_b_table_,
+                                                b_f_buff_, interval_b_, load_b_,
+                                                load_s_b_, b_f_, bs_i_f_)
+                        : 0;
+      padding_0_2 = (upper_want)
+                        ? pre_upper - Select_Lg(upper_index, select_b_table_,
+                                                b_f_buff_, interval_b_, load_b_,
+                                                load_s_b_, b_f_, bs_i_f_)
+                        : 0;
+      if (!lower_want) {
+        lower_bound =
+            Select_Lg(lower_bound, select_bb_table_, bb_f_buff_, interval_bb_,
+                      load_bb_, load_s_bb_, bb_f_, bb_i_f_);
+      } else {
+        lower_bound =
+            Select_Lg(lower_bound, select_bb_table_, bb_f_buff_, interval_bb_,
+                      load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+            padding_0_1;
+      }
+      if (!upper_want) {
+        if (upper_bound == static_cast<int>(s_f_size_)) {
+          upper_bound = max_index - 1;
+        } else {
+          upper_bound =
+              Select_Lg(upper_bound + 1, select_bb_table_, bb_f_buff_,
+                        interval_bb_, load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
+              1;
+        }
+      } else {
+        upper_bound =
+            Select_Lg(upper_bound, select_bb_table_, bb_f_buff_, interval_bb_,
+                      load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+            padding_0_2;
+      }
+      if (c == '[') {
+        curr_index = lower_bound;
+        done = true;
+        break;
+      }
+      lower_want = false;
+      upper_want = false;
+    }
+    if (done) {
+      count = 0;
+      int result_len = 0, offset_count = 0, pre_index = 0, rank_index = 0,
+          cc = 0, padding = 0, occ = 0;
+      bool index_want = false;
+      char offset_get[65] = {'\0'};
+      while (true) {
+        pre_index = curr_index;
+        rank_index = rank_lg_function(b_f_buff_, occ_b_table_, curr_index + 1,
+                                      8, load_r_b_, load_b_, b_f_, b_i_f_);
+        if (load_s_) {
+          cc = s_f_buff_[rank_index - 1];
+        } else {
+          lseek(s_f_, rank_index - 1, SEEK_SET);
+          read(s_f_, &cc, 1);
+        }
+        if (cc == ']') {
+          return count;
+        }
+        result[count] = cc;
+        ++count;
+        if (load_s_ && load_r_s_) {
+          occ = Occ_Function_Sm_Md(cc, rank_index, occ_s_table_, s_f_buff_,
+                                   mapping_table_, num_of_char_, step_s_size_,
+                                   s_i_f_size_);
+        } else {
+          occ = Occ_Function_Lg(cc, rank_index, occ_s_table_, s_f_buff_,
+                                mapping_table_, num_of_char_, step_s_size_,
+                                load_s_, load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+        }
+        if (load_s_) {
+          index_want = (s_f_buff_[rank_index - 1] == cc);
+        } else {
+          char temp_c = 0;
+          lseek(s_f_, rank_index - 1, SEEK_SET);
+          read(s_f_, &temp_c, 1);
+          if (temp_c == cc) {
+            index_want = true;
+          } else {
+            index_want = false;
+          }
+        }
+        curr_index = c_s_table_[cc - 1] + occ;
+        padding = (index_want)
+                      ? pre_index - Select_Lg(rank_index, select_b_table_,
+                                              b_f_buff_, interval_b_, load_b_,
+                                              load_s_b_, b_f_, bs_i_f_)
+                      : 0;
+        if (!index_want) {
+          if (curr_index == static_cast<int>(s_f_size_)) {
+            curr_index = max_index - 1;
+          } else {
+            curr_index =
+                Select_Lg(curr_index + 1, select_bb_table_, bb_f_buff_,
+                          interval_bb_, load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
+                1;
+          }
+        } else {
+          curr_index =
+              Select_Lg(curr_index, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+              padding;
+        }
+        if (lower_bound <= curr_index && curr_index <= upper_bound) {
+          break;
+        }
+      }
+    }
+  }
+  --len_of_pattern_;
+  for (int i = 0; i != len_of_pattern_; ++i) {
+    search_pattern_[i] = search_pattern_[i + 1];
+  }
+  search_pattern_[len_of_pattern_] = '\0';
+  return count;
+}
+
+int RLEBWT::search_n_lg(MyArray<char>& result) {
+  // search_pattern_[len_of_pattern_] = ']';
+  // ++len_of_pattern_;
   int c = ']', curr_index = 0, count = 0,
       max_index = c_table_[NUMBER_OF_CHAR - 1];
   MyArray<int32_t> reverse_map = new int32_t[num_of_char_];
@@ -813,14 +1014,19 @@ void RLEBWT::Search_Lg() {
     printf("%d\n", search_r_lg());
   } else if (mode == 'n') {
     MyArray<char> result = new char[MAX_SEARCH_PATTERN_LEN];
-    auto count = search_n_lg(result);
+    auto count = search_n_lg_back(result);
     if (count == -1) {
-      return;
+      count = search_n_lg(result);
+      for (int i = 0; i != count; ++i) {
+        putchar(result[i]);
+      }
+      putchar('\n');
+    } else if (count > 0) {
+      for (int i = count - 1; i != -1; --i) {
+        putchar(result[i]);
+      }
+      putchar('\n');
     }
-    for (int i = 0; i != count; ++i) {
-      putchar(result[i]);
-    }
-    putchar('\n');
   } else {
     fprintf(stderr, "Invalid search flag.\n");
   }

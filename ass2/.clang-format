@@ -1,0 +1,6 @@
+# PointerAlignment: Left
+# SpacesBeforeTrailingComments: 2
+# TabWidth: 2
+# IndentWidth: 2
+# AccessModifierOffset: 1
+BasedOnStyle: Google

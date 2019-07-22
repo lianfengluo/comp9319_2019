@@ -110,6 +110,10 @@ RLEBWT::RLEBWT(char* argv[])
   String s_f_n{filepath_}, b_f_n{filepath_};
   s_f_n += ".s";
   b_f_n += ".b";
+  if (access(s_f_n.c_str(), F_OK) == -1 || access(b_f_n.c_str(), F_OK) == -1) {
+    fprintf(stderr, "file not exists\n");
+    exit(1);
+  }
   s_f_ = open(s_f_n.c_str(), O_RDONLY);
   b_f_ = open(b_f_n.c_str(), O_RDONLY);
   s_f_size_ = lseek(s_f_, 0, SEEK_END);

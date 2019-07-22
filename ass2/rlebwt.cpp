@@ -12,6 +12,7 @@ int main(int argc, char *argv[]) {
   if (argc != 5 || strlen(argv[1]) != 2) {
     exit(1);
   }
+  mkdir(argv[3], 0777);
   RLEBWT rlebwt_worker{argv};
   rlebwt_worker.Build_S_B_Index();
   if (!rlebwt_worker.Existsbb()) {

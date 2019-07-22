@@ -25,8 +25,8 @@ const int START_UP_SIZE = 4.25 * 1024 * 1024;
 const int TOTAL_SPACE = 16 * 1024 * 1024;
 const int WRITE_NUM_OF_CHUNK = 2000;
 // 11.75MB
-// const int MAX_FREE_MEMORY = TOTAL_SPACE - START_UP_SIZE;
-const int MAX_FREE_MEMORY = 1024 * 1024;
+const int MAX_FREE_MEMORY = TOTAL_SPACE - START_UP_SIZE;
+// const int MAX_FREE_MEMORY = 1024 * 1024;
 const int MAX_FREE_BITS = MAX_FREE_MEMORY * 8;
 const int MAX_SEARCH_PATTERN_LEN = 5000;
 const int MAX_RESULT_NUM = 5000;
@@ -173,6 +173,7 @@ class RLEBWT {
   int search_r_lg();
   int search_a_lg(MyArray<size_t>& results);
   int search_n_lg(MyArray<char>& result);
+  int search_n_lg_back(MyArray<char>& result);
   int binary_search_s_sm(int pos_c, int c);
   int binary_search_lg(int pos_c, int c);
   int interval_b_ = 0, interval_bb_ = 0;

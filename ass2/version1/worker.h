@@ -125,6 +125,7 @@ class RLEBWT {
   int search_r_lg();
   int search_a_lg(std::unique_ptr<size_t[]>& results);
   int search_n_lg(std::unique_ptr<char[]>& result);
+  int search_n_lg_back(std::unique_ptr<char[]>& result);
   int binary_search_s_sm(int pos_c, int c);
   int binary_search_lg(int pos_c, int c);
   int interval_b_ = 0, interval_bb_ = 0;
