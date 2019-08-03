@@ -10,7 +10,7 @@
 
 // 1MB
 const int READ_BUFF_SIZE = 1024 * 1024;
-// 10K
+// 20K
 const int MIN_READ_BUFF = 20 * 1024;
 // 1MB
 const int WRITE_BUFF_SIZE = 1024 * 1024;
@@ -23,7 +23,7 @@ const int CHUNK_SIZE = NUMBER_OF_CHAR * sizeof(int32_t);
 // 4.25MB
 const int START_UP_SIZE = 4.25 * 1024 * 1024;
 const int TOTAL_SPACE = 16 * 1024 * 1024;
-const int WRITE_NUM_OF_CHUNK = 2000;
+const int WRITE_NUM_OF_CHUNK = 5000;
 // 11.75MB
 const int MAX_FREE_MEMORY = TOTAL_SPACE - START_UP_SIZE;
 // const int MAX_FREE_MEMORY = 1024 * 1024;
@@ -69,18 +69,21 @@ struct String {
 
 template <typename T>
 struct MyArray {
-  T* buffer_ = nullptr;
+  T* buffer_;
   MyArray(T* ptr) { buffer_ = ptr; };
   MyArray(int size) : buffer_{new T[size]} {};
   inline T& operator[](int i) { return buffer_[i]; }
-  inline T operator[](int i) const { return buffer_[i]; }
+  inline const T& operator[](int i) const { return buffer_[i]; }
   MyArray& operator=(T* ptr) {
     delete[] buffer_;
     buffer_ = ptr;
     return *this;
   }
   inline T* get() { return buffer_; }
-  ~MyArray() { delete[] buffer_; };
+  ~MyArray() {
+    delete[] buffer_;
+    buffer_ = nullptr;
+  };
 };
 
 // in work_sm.cpp
@@ -161,6 +164,11 @@ class RLEBWT {
   void get_lower_uppder_bound_sm(int& lower_bound, int& upper_bound, int c);
   void get_lower_uppder_bound_md(int& lower_bound, int& upper_bound, int c);
   void get_lower_uppder_bound_lg(int& lower_bound, int& upper_bound, int c);
+  int recursive_count(int lower, int upper, int c, int lower_bound,
+                      int upper_bound);
+  void recursive_search(int lower, int upper, int c, int lower_bound,
+                        int upper_bound, MyArray<size_t>& results, int& count);
+  void get_offset(MyArray<size_t>& results, int& count, int curr_index);
   int search_m_sm();
   int search_r_sm();
   int search_a_sm(MyArray<size_t>& results);

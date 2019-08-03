@@ -3,15 +3,15 @@
 String::String(const char* string) {
   size_ = strlen(string);
   buffer_ = new char[size_ + 1];
-  strcpy(buffer_, string);
   buffer_[size_] = '\0';
+  strcpy(buffer_, string);
 }
 
 String::String(const String& other) {
   size_ = other.size();
   buffer_ = new char[size_ + 1];
-  strcpy(buffer_, other.buffer_);
   buffer_[size_] = '\0';
+  strcpy(buffer_, other.buffer_);
 }
 
 String& String::operator+=(const String& other) {
@@ -45,9 +45,9 @@ String& String::operator+=(const char* other) {
 String& String::operator=(const String& other) {
   delete[] buffer_;
   buffer_ = new char[other.size() + 1];
-  strcpy(buffer_, other.buffer_);
   size_ = other.size();
   buffer_[size_] = '\0';
+  strcpy(buffer_, other.buffer_);
   return *this;
 }
 
@@ -58,7 +58,10 @@ void String::resize(size_t size) {
   buffer_[size] = '\0';
 }
 
-String::~String() { delete[] buffer_; }
+String::~String() {
+  delete[] buffer_;
+  buffer_ = nullptr;
+}
 
 int64_t pow(int base, int power) {
   int64_t result = 1;
@@ -83,9 +86,9 @@ static size_t fetch_new_bits(int file, MyArray<char>& r_buff2) {
 
 RLEBWT::RLEBWT(char* argv[])
     : filepath_{argv[2]},
-      c_table_{new int32_t[NUMBER_OF_CHAR]},
-      c_s_table_{new int32_t[NUMBER_OF_CHAR]},
-      mapping_table_{new int32_t[NUMBER_OF_CHAR]} {
+      c_table_(NUMBER_OF_CHAR),
+      c_s_table_(NUMBER_OF_CHAR),
+      mapping_table_(NUMBER_OF_CHAR) {
   for (int j = 0; j != NUMBER_OF_CHAR; ++j) {
     c_table_[j] = 0;
     c_s_table_[j] = 0;
@@ -120,7 +123,7 @@ RLEBWT::RLEBWT(char* argv[])
   lseek(s_f_, 0, SEEK_SET);
   b_f_size_ = lseek(b_f_, 0, SEEK_END);
   lseek(b_f_, 0, SEEK_SET);
-  if (b_f_size_ > BUILD_SIZE && s_f_size_ > 1024) {
+  if (b_f_size_ > BUILD_SIZE && s_f_size_ > 1024 * 5) {
     large_file_ = true;
     if (b_f_size_ * 4 + s_f_size_ * 2 <= MAX_FREE_MEMORY) {
       medium_file_ = true;
@@ -216,7 +219,8 @@ static void write_bb(MyArray<char>& w_buff, char r_s_buff[MIN_READ_BUFF],
           }
         } else {
           if (done) break;
-          c = r_s_buff[s_index++];
+          c = r_s_buff[s_index];
+          ++s_index;
           if (processing_table[c]) {
             if (count_c[c] >= start_write[c]) {
               w_byte = write_pos[c] / 8;
@@ -251,7 +255,7 @@ void RLEBWT::Createbb() {
   int bb_f = open(bb_f_n.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
   size_t buff_size =
       (b_f_size_ > MAX_FREE_MEMORY) ? MAX_FREE_MEMORY : b_f_size_;
-  MyArray<char> w_buff = new char[buff_size];
+  MyArray<char> w_buff(buff_size);
   char r_s_buff[MIN_READ_BUFF];
   char r_b_buff[MIN_READ_BUFF];
   int repeat = ((b_f_size_ - 1) / buff_size + 1);
@@ -281,6 +285,7 @@ void RLEBWT::Build_BB_Index() {
     Build_BB_Index_SM();
   } else {
     Build_BB_Index_LG(bb_i_f_name);
+    lseek(bb_f_, 0, SEEK_SET);
   }
 }
 
@@ -305,7 +310,8 @@ static void build_s_b_index(
       } else {
         // 1-bit
         if (done) return;
-        c = r_buff[s_index++];
+        c = r_buff[s_index];
+        ++s_index;
         ++tmp_table[mapping_table[c]];
         ++c_table[c];
         ++num_of_1;
@@ -337,7 +343,8 @@ static void build_s_b_index(
           s_index = 0;
           s_f_r = fetch_new_bits(s_f, r_buff);
           if (s_f_r == 0) {
-            w_buff2[write_pos_b++] = num_of_1;
+            w_buff2[write_pos_b] = num_of_1;
+            ++write_pos_b;
             done = true;
           }
         }
@@ -370,11 +377,11 @@ void RLEBWT::Build_S_B_Index_LG(int s_f, int b_f) {
   const int interval = ((s_f_size_ * 4 - 1) / (b_f_size_ / 2) + 1);
   int c_table_f = open(c_table_f_n.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
   int chunk_size = sizeof(int32_t) * num_of_char_;
-  MyArray<char> r_buff = new char[READ_BUFF_SIZE];
-  MyArray<char> r_buff2 = new char[READ_BUFF_SIZE];
-  MyArray<int32_t> w_buff = new int32_t[chunk_size * WRITE_NUM_OF_CHUNK];
-  MyArray<int32_t> w_buff2 = new int32_t[WRITE_BUFF_CHUNK];
-  MyArray<int32_t> w_buff3 = new int32_t[WRITE_BUFF_CHUNK];
+  MyArray<char> r_buff(READ_BUFF_SIZE);
+  MyArray<char> r_buff2(READ_BUFF_SIZE);
+  MyArray<int32_t> w_buff(chunk_size * WRITE_NUM_OF_CHUNK);
+  MyArray<int32_t> w_buff2(WRITE_BUFF_CHUNK);
+  MyArray<int32_t> w_buff3(WRITE_BUFF_CHUNK);
   // giving the chunk for the c_table and c_s_table. Therefore, I minus 2.
   int max_chunks_nums = (s_f_size_ - 2 * CHUNK_SIZE) / chunk_size;
   int step_size = 0, bit_index = 0;
@@ -388,7 +395,7 @@ void RLEBWT::Build_S_B_Index_LG(int s_f, int b_f) {
       write_pos_b_s = 0;
   size_t s_f_r = fetch_new_bits(s_f, r_buff), s_index = 0;
   int c = 0;
-  MyArray<int32_t> temp_table = new int32_t[num_of_char_];
+  MyArray<int32_t> temp_table(num_of_char_);
   while ((readByte = read(b_f, r_buff2.get(), READ_BUFF_SIZE))) {
     build_s_b_index(r_buff, r_buff2, c_table_, readByte, w_buff, w_buff2,
                     s_f_index_f, b_f_index_f, step_size, real_chunks_nums,
@@ -443,11 +450,11 @@ void RLEBWT::Build_S_B_Index() {
   create_mapping(mapping_table_, c_s_table_, s_f_, num_of_char_);
   if (large_file_) {
     Build_S_B_Index_LG(s_f_, b_f_);
+    lseek(s_f_, 0, SEEK_SET);
+    lseek(b_f_, 0, SEEK_SET);
   } else {
     Build_S_B_Index_SM(s_f_, b_f_);
   }
-  lseek(s_f_, 0, SEEK_SET);
-  lseek(b_f_, 0, SEEK_SET);
 }
 
 int binary_search_char(int index, int num_of_char,
@@ -479,8 +486,8 @@ int binary_search_char(int index, int num_of_char,
 void RLEBWT::Build_BB_Index_LG(String& bb_i_f_name) {
   int bb_i_f = open(bb_i_f_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
   int readByte = 0;
-  MyArray<char> r_buff = new char[READ_BUFF_SIZE];
-  MyArray<int32_t> w_buff = new int32_t[WRITE_BUFF_CHUNK];
+  MyArray<char> r_buff(READ_BUFF_SIZE);
+  MyArray<int32_t> w_buff(WRITE_BUFF_CHUNK);
   const int interval = ((s_f_size_ * 4 - 1) / (b_f_size_) + 1);
   int write_pos = 0, num_of_1 = 0, bit_index = 0;
   int c = 0;
@@ -508,11 +515,13 @@ void RLEBWT::Build_BB_Index_LG(String& bb_i_f_name) {
     write(bb_i_f, w_buff.get(), write_pos * sizeof(int32_t));
   }
   close(bb_i_f);
-  lseek(bb_f_, 0, SEEK_SET);
 }
 
 void RLEBWT::Search() {
   if (large_file_) {
+    lseek(s_f_, 0, SEEK_SET);
+    lseek(b_f_, 0, SEEK_SET);
+    lseek(bb_f_, 0, SEEK_SET);
     if (medium_file_) {
       Search_Medium();
     } else {

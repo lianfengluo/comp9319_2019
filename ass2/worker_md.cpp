@@ -211,44 +211,23 @@ int RLEBWT::search_r_md() {
   int lower_bound = c_table_[c - 1], upper_bound = c_table_[c] - 1;
   get_lower_uppder_bound_md(lower_bound, upper_bound, c);
   if (upper_bound >= lower_bound) {
-    int occ = 0, curr_index = 0, padding = 0, cc = 0;
-    int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
+    int rank_index = 0, cc = 0;
+    bool arr[NUMBER_OF_CHAR] = {false};
     for (int i = lower_bound; i <= upper_bound; ++i) {
-      curr_index = i;
-      while (true) {
-        pre_index = curr_index;
-        rank_index =
-            Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, curr_index + 1, 8);
+      rank_index = Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, i + 1, 8);
+      if (load_s_) {
         cc = s_f_buff_[rank_index - 1];
-        if (cc == ']') {
-          ++count;
-          break;
-        }
-        occ = Occ_Function_Sm_Md(cc, rank_index, occ_s_table_, s_f_buff_,
-                                 mapping_table_, num_of_char_, step_s_size_,
-                                 s_i_f_size_);
-        curr_index = c_s_table_[cc - 1] + occ;
-        padding = (s_f_buff_[rank_index - 1] == cc)
-                      ? pre_index - Select_Sm_Md(rank_index, select_b_table_,
-                                                 b_f_buff_, interval_b_)
-                      : 0;
-        if (s_f_buff_[rank_index - 1] != cc) {
-          if (curr_index == static_cast<int>(s_f_size_)) {
-            curr_index = max_index - 1;
-          } else {
-            curr_index = Select_Sm_Md(curr_index + 1, select_bb_table_,
-                                      bb_f_buff_, interval_bb_) -
-                         1;
-          }
-        } else {
-          curr_index = Select_Sm_Md(curr_index, select_bb_table_, bb_f_buff_,
-                                    interval_bb_) +
-                       padding;
-        }
-        if (lower_bound <= curr_index && curr_index <= upper_bound) {
-          break;
-        }
+      } else {
+        lseek(s_f_, rank_index - 1, SEEK_SET);
+        read(s_f_, &cc, 1);
       }
+      if (arr[cc] == false) {
+        arr[cc] = true;
+      } else {
+        continue;
+      }
+      count += recursive_count(lower_bound, upper_bound, cc, lower_bound,
+                               upper_bound);
     }
   }
   return count;
@@ -259,55 +238,23 @@ int RLEBWT::search_a_md(MyArray<size_t>& results) {
   int lower_bound = c_table_[c - 1], upper_bound = c_table_[c] - 1;
   get_lower_uppder_bound_md(lower_bound, upper_bound, c);
   if (upper_bound >= lower_bound) {
-    int occ = 0, curr_index = 0, padding = 0, cc = 0;
-    int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
+    int rank_index = 0, cc = 0;
+    bool arr[NUMBER_OF_CHAR] = {false};
     for (int i = lower_bound; i <= upper_bound; ++i) {
-      size_t result = 0;
-      int result_len = 0;
-      curr_index = i;
-      bool record = false;
-      while (true) {
-        pre_index = curr_index;
-        rank_index =
-            Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, curr_index + 1, 8);
+      rank_index = Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, i + 1, 8);
+      if (load_s_) {
         cc = s_f_buff_[rank_index - 1];
-        if (cc == '[') {
-          results[count] = result;
-          ++count;
-          break;
-        }
-        if (record) {
-          result += (cc - '0') * static_cast<size_t>(pow(10, result_len));
-          ++result_len;
-        }
-        if (cc == ']') {
-          record = true;
-        }
-        occ = Occ_Function_Sm_Md(cc, rank_index, occ_s_table_, s_f_buff_,
-                                 mapping_table_, num_of_char_, step_s_size_,
-                                 s_i_f_size_);
-        curr_index = c_s_table_[cc - 1] + occ;
-        padding = (s_f_buff_[rank_index - 1] == cc)
-                      ? pre_index - Select_Sm_Md(rank_index, select_b_table_,
-                                                 b_f_buff_, interval_b_)
-                      : 0;
-        if (s_f_buff_[rank_index - 1] != cc) {
-          if (curr_index == static_cast<int>(s_f_size_)) {
-            curr_index = max_index - 1;
-          } else {
-            curr_index = Select_Sm_Md(curr_index + 1, select_bb_table_,
-                                      bb_f_buff_, interval_bb_) -
-                         1;
-          }
-        } else {
-          curr_index = Select_Sm_Md(curr_index, select_bb_table_, bb_f_buff_,
-                                    interval_bb_) +
-                       padding;
-        }
-        if (lower_bound <= curr_index && curr_index <= upper_bound) {
-          break;
-        }
+      } else {
+        lseek(s_f_, rank_index - 1, SEEK_SET);
+        read(s_f_, &cc, 1);
       }
+      if (arr[cc] == false) {
+        arr[cc] = true;
+      } else {
+        continue;
+      }
+      recursive_search(lower_bound, upper_bound, cc, lower_bound, upper_bound,
+                       results, count);
     }
   }
   qsort(results.get(), count, sizeof(size_t), Compare);
@@ -324,7 +271,8 @@ void RLEBWT::Search_Medium() {
     int count = 0;
     for (int i = 0; i != NUMBER_OF_CHAR; ++i) {
       if (c_s_table_[i]) {
-        mapping_table_[i] = count++;
+        mapping_table_[i] = count;
+        ++count;
       }
     }
     Sum_C_Table();
@@ -369,6 +317,13 @@ void RLEBWT::Search_Medium() {
   close(b_i_f);
   close(bs_i_f);
   close(bb_i_f);
+  load_s_ = true;
+  load_b_ = true;
+  load_s_b_ = true;
+  load_r_b_ = true;
+  load_bb_ = true;
+  load_s_bb_ = true;
+  load_r_s_ = true;
   // interval getting
   interval_b_ = ((s_f_size_ * 4 - 1) / (b_f_size_ / 2) + 1);
   interval_bb_ = ((s_f_size_ * 4 - 1) / (b_f_size_) + 1);

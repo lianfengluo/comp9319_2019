@@ -299,91 +299,445 @@ void RLEBWT::get_lower_uppder_bound_lg(int& lower_bound, int& upper_bound,
   }
 }
 
+void RLEBWT::recursive_search(int lower, int upper, int c, int lower_bound,
+                              int upper_bound, MyArray<size_t>& results,
+                              int& count) {
+  int occurrence_1 = 0, occurrence_2 = 0;
+  if (lower == upper) {
+    int padding_0_2 = 0, pre_upper = 0, upper_index = 0,
+        max_index = c_table_[NUMBER_OF_CHAR - 1];
+    bool upper_want = false;
+    pre_upper = upper;
+    upper_index = rank_lg_function(b_f_buff_, occ_b_table_, upper + 1, 8,
+                                   load_r_b_, load_b_, b_f_, b_i_f_);
+    if (load_s_ && load_r_s_) {
+      occurrence_2 = Occ_Function_Sm_Md(c, upper_index, occ_s_table_, s_f_buff_,
+                                        mapping_table_, num_of_char_,
+                                        step_s_size_, s_i_f_size_);
+    } else {
+      occurrence_2 = Occ_Function_Lg(
+          c, upper_index, occ_s_table_, s_f_buff_, mapping_table_, num_of_char_,
+          step_s_size_, load_s_, load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+    }
+    upper = c_s_table_[c - 1] + occurrence_2;
+    if (!load_s_) {
+      int temp_c = '\0';
+      lseek(s_f_, upper_index - 1, SEEK_SET);
+      read(s_f_, &temp_c, 1);
+      if (temp_c == c) {
+        upper_want = true;
+      }
+    } else {
+      upper_want = (s_f_buff_[upper_index - 1] == c);
+    }
+    padding_0_2 = (upper_want)
+                      ? pre_upper - Select_Lg(upper_index, select_b_table_,
+                                              b_f_buff_, interval_b_, load_b_,
+                                              load_s_b_, b_f_, bs_i_f_)
+                      : 0;
+    if (!upper_want) {
+      if (upper == static_cast<int>(s_f_size_)) {
+        upper = max_index - 1;
+      } else {
+        upper = Select_Lg(upper + 1, select_bb_table_, bb_f_buff_, interval_bb_,
+                          load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
+                1;
+      }
+    } else {
+      upper = Select_Lg(upper, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+              padding_0_2;
+    }
+    if (upper >= lower_bound && upper <= upper_bound) {
+      return;
+    }
+    if (c == ']') {
+      get_offset(results, count, upper);
+      return;
+    }
+    int rank_index = 0;
+    rank_index = rank_lg_function(b_f_buff_, occ_b_table_, upper + 1, 8,
+                                  load_r_b_, load_b_, b_f_, b_i_f_);
+    if (load_s_) {
+      c = s_f_buff_[rank_index - 1];
+    } else {
+      lseek(s_f_, rank_index - 1, SEEK_SET);
+      read(s_f_, &c, 1);
+    }
+    recursive_search(upper, upper, c, lower_bound, upper_bound, results, count);
+  } else {
+    int padding_0_1 = 0, padding_0_2 = 0, pre_lower = 0, pre_upper = 0,
+        upper_index = 0, lower_index = 0,
+        max_index = c_table_[NUMBER_OF_CHAR - 1];
+    bool lower_want = false, upper_want = false;
+    pre_lower = lower;
+    pre_upper = upper;
+    lower_index = rank_lg_function(b_f_buff_, occ_b_table_, lower + 1, 8,
+                                   load_r_b_, load_b_, b_f_, b_i_f_);
+    upper_index = rank_lg_function(b_f_buff_, occ_b_table_, upper + 1, 8,
+                                   load_r_b_, load_b_, b_f_, b_i_f_);
+    if (load_s_ && load_r_s_) {
+      occurrence_1 = Occ_Function_Sm_Md(c, lower_index - 1, occ_s_table_,
+                                        s_f_buff_, mapping_table_, num_of_char_,
+                                        step_s_size_, s_i_f_size_);
+      occurrence_2 = Occ_Function_Sm_Md(c, upper_index, occ_s_table_, s_f_buff_,
+                                        mapping_table_, num_of_char_,
+                                        step_s_size_, s_i_f_size_);
+    } else {
+      occurrence_1 =
+          Occ_Function_Lg(c, lower_index - 1, occ_s_table_, s_f_buff_,
+                          mapping_table_, num_of_char_, step_s_size_, load_s_,
+                          load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+      occurrence_2 = Occ_Function_Lg(
+          c, upper_index, occ_s_table_, s_f_buff_, mapping_table_, num_of_char_,
+          step_s_size_, load_s_, load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+    }
+    lower = c_s_table_[c - 1] + occurrence_1 + 1;
+    upper = c_s_table_[c - 1] + occurrence_2;
+    if (!load_s_) {
+      int temp_c = '\0';
+      lseek(s_f_, upper_index - 1, SEEK_SET);
+      read(s_f_, &temp_c, 1);
+      if (temp_c == c) {
+        upper_want = true;
+      }
+      lseek(s_f_, lower_index - 1, SEEK_SET);
+      read(s_f_, &temp_c, 1);
+      if (temp_c == c) {
+        lower_want = true;
+      }
+    } else {
+      lower_want = (s_f_buff_[lower_index - 1] == c);
+      upper_want = (s_f_buff_[upper_index - 1] == c);
+    }
+    padding_0_1 = (lower_want)
+                      ? pre_lower - Select_Lg(lower_index, select_b_table_,
+                                              b_f_buff_, interval_b_, load_b_,
+                                              load_s_b_, b_f_, bs_i_f_)
+                      : 0;
+    padding_0_2 = (upper_want)
+                      ? pre_upper - Select_Lg(upper_index, select_b_table_,
+                                              b_f_buff_, interval_b_, load_b_,
+                                              load_s_b_, b_f_, bs_i_f_)
+                      : 0;
+    if (!lower_want) {
+      lower = Select_Lg(lower, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_);
+    } else {
+      lower = Select_Lg(lower, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+              padding_0_1;
+    }
+    if (!upper_want) {
+      if (upper == static_cast<int>(s_f_size_)) {
+        upper = max_index - 1;
+      } else {
+        upper = Select_Lg(upper + 1, select_bb_table_, bb_f_buff_, interval_bb_,
+                          load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
+                1;
+      }
+    } else {
+      upper = Select_Lg(upper, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+              padding_0_2;
+    }
+    if ((lower >= lower_bound && lower <= upper_bound) ||
+        (upper >= lower_bound && upper <= upper_bound)) {
+      return;
+    }
+    if (c == ']') {
+      for (int i = lower; i != upper + 1; ++i) {
+        get_offset(results, count, i);
+      }
+      return;
+    }
+    int rank_index = 0;
+    bool arr[NUMBER_OF_CHAR] = {false};
+    for (int i = lower; i <= upper; ++i) {
+      rank_index = rank_lg_function(b_f_buff_, occ_b_table_, i + 1, 8,
+                                    load_r_b_, load_b_, b_f_, b_i_f_);
+      if (load_s_) {
+        c = s_f_buff_[rank_index - 1];
+      } else {
+        lseek(s_f_, rank_index - 1, SEEK_SET);
+        read(s_f_, &c, 1);
+      }
+      if (arr[c] == false) {
+        arr[c] = true;
+      } else {
+        continue;
+      }
+      recursive_search(lower, upper, c, lower_bound, upper_bound, results,
+                       count);
+    }
+  }
+}
+
+void RLEBWT::get_offset(MyArray<size_t>& results, int& count, int curr_index) {
+  size_t result = 0;
+  int result_len = 0;
+  bool index_want = false;
+  int occ = 0, padding = 0, cc = 0;
+  int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
+  while (true) {
+    pre_index = curr_index;
+    rank_index = rank_lg_function(b_f_buff_, occ_b_table_, curr_index + 1, 8,
+                                  load_r_b_, load_b_, b_f_, b_i_f_);
+    if (load_s_) {
+      cc = s_f_buff_[rank_index - 1];
+    } else {
+      lseek(s_f_, rank_index - 1, SEEK_SET);
+      read(s_f_, &cc, 1);
+    }
+    if (cc == '[') {
+      results[count] = result;
+      ++count;
+      return;
+    }
+    result += (cc - '0') * static_cast<size_t>(pow(10, result_len));
+    ++result_len;
+    if (load_s_ && load_r_s_) {
+      occ = Occ_Function_Sm_Md(cc, rank_index, occ_s_table_, s_f_buff_,
+                               mapping_table_, num_of_char_, step_s_size_,
+                               s_i_f_size_);
+    } else {
+      occ = Occ_Function_Lg(cc, rank_index, occ_s_table_, s_f_buff_,
+                            mapping_table_, num_of_char_, step_s_size_, load_s_,
+                            load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+    }
+    if (load_s_) {
+      index_want = (s_f_buff_[rank_index - 1] == cc);
+    } else {
+      char temp_c = 0;
+      lseek(s_f_, rank_index - 1, SEEK_SET);
+      read(s_f_, &temp_c, 1);
+      if (temp_c == cc) {
+        index_want = true;
+      } else {
+        index_want = false;
+      }
+    }
+    curr_index = c_s_table_[cc - 1] + occ;
+    padding = (index_want)
+                  ? pre_index - Select_Lg(rank_index, select_b_table_,
+                                          b_f_buff_, interval_b_, load_b_,
+                                          load_s_b_, b_f_, bs_i_f_)
+                  : 0;
+    if (!index_want) {
+      if (curr_index == static_cast<int>(s_f_size_)) {
+        curr_index = max_index - 1;
+      } else {
+        curr_index =
+            Select_Lg(curr_index + 1, select_bb_table_, bb_f_buff_,
+                      interval_bb_, load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
+            1;
+      }
+    } else {
+      curr_index =
+          Select_Lg(curr_index, select_bb_table_, bb_f_buff_, interval_bb_,
+                    load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+          padding;
+    }
+  }
+}
+
 int RLEBWT::search_a_lg(MyArray<size_t>& results) {
   int c = search_pattern_[len_of_pattern_ - 1], count = 0;
   int lower_bound = c_table_[c - 1], upper_bound = c_table_[c] - 1;
   get_lower_uppder_bound_lg(lower_bound, upper_bound, c);
   if (upper_bound >= lower_bound) {
-    int occ = 0, curr_index = 0, padding = 0, cc = 0;
-    int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
-    bool index_want = false;
+    int rank_index = 0, cc = 0;
+    bool arr[NUMBER_OF_CHAR] = {false};
     for (int i = lower_bound; i <= upper_bound; ++i) {
-      size_t result = 0;
-      int result_len = 0;
-      curr_index = i;
-      bool record = false;
-      while (true) {
-        pre_index = curr_index;
-        rank_index = rank_lg_function(b_f_buff_, occ_b_table_, curr_index + 1,
-                                      8, load_r_b_, load_b_, b_f_, b_i_f_);
-        if (load_s_) {
-          cc = s_f_buff_[rank_index - 1];
-        } else {
-          lseek(s_f_, rank_index - 1, SEEK_SET);
-          read(s_f_, &cc, 1);
-        }
-        if (cc == '[') {
-          results[count] = result;
-          ++count;
-          break;
-        }
-        if (record) {
-          result += (cc - '0') * static_cast<size_t>(pow(10, result_len));
-          ++result_len;
-        }
-        if (cc == ']') {
-          record = true;
-        }
-        if (load_s_ && load_r_s_) {
-          occ = Occ_Function_Sm_Md(cc, rank_index, occ_s_table_, s_f_buff_,
-                                   mapping_table_, num_of_char_, step_s_size_,
-                                   s_i_f_size_);
-        } else {
-          occ = Occ_Function_Lg(cc, rank_index, occ_s_table_, s_f_buff_,
-                                mapping_table_, num_of_char_, step_s_size_,
-                                load_s_, load_r_s_, s_f_, s_i_f_, s_i_f_size_);
-        }
-        if (load_s_) {
-          index_want = (s_f_buff_[rank_index - 1] == cc);
-        } else {
-          char temp_c = 0;
-          lseek(s_f_, rank_index - 1, SEEK_SET);
-          read(s_f_, &temp_c, 1);
-          if (temp_c == cc) {
-            index_want = true;
-          } else {
-            index_want = false;
-          }
-        }
-        curr_index = c_s_table_[cc - 1] + occ;
-        padding = (index_want)
-                      ? pre_index - Select_Lg(rank_index, select_b_table_,
-                                              b_f_buff_, interval_b_, load_b_,
-                                              load_s_b_, b_f_, bs_i_f_)
-                      : 0;
-        if (!index_want) {
-          if (curr_index == static_cast<int>(s_f_size_)) {
-            curr_index = max_index - 1;
-          } else {
-            curr_index =
-                Select_Lg(curr_index + 1, select_bb_table_, bb_f_buff_,
-                          interval_bb_, load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
-                1;
-          }
-        } else {
-          curr_index =
-              Select_Lg(curr_index, select_bb_table_, bb_f_buff_, interval_bb_,
-                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
-              padding;
-        }
-        if (lower_bound <= curr_index && curr_index <= upper_bound) {
-          break;
-        }
+      rank_index = rank_lg_function(b_f_buff_, occ_b_table_, i + 1, 8,
+                                    load_r_b_, load_b_, b_f_, b_i_f_);
+      if (load_s_) {
+        cc = s_f_buff_[rank_index - 1];
+      } else {
+        lseek(s_f_, rank_index - 1, SEEK_SET);
+        read(s_f_, &cc, 1);
       }
+      if (arr[cc] == false) {
+        arr[cc] = true;
+      } else {
+        continue;
+      }
+      recursive_search(lower_bound, upper_bound, cc, lower_bound, upper_bound,
+                       results, count);
     }
   }
   qsort(results.get(), count, sizeof(size_t), Compare);
   return count;
+}
+
+int RLEBWT::recursive_count(int lower, int upper, int c, int lower_bound,
+                            int upper_bound) {
+  int occurrence_1 = 0, occurrence_2 = 0;
+  if (lower == upper) {
+    int padding_0_2 = 0, pre_upper = 0, upper_index = 0,
+        max_index = c_table_[NUMBER_OF_CHAR - 1];
+    bool upper_want = false;
+    pre_upper = upper;
+    upper_index = rank_lg_function(b_f_buff_, occ_b_table_, upper + 1, 8,
+                                   load_r_b_, load_b_, b_f_, b_i_f_);
+    if (load_s_ && load_r_s_) {
+      occurrence_2 = Occ_Function_Sm_Md(c, upper_index, occ_s_table_, s_f_buff_,
+                                        mapping_table_, num_of_char_,
+                                        step_s_size_, s_i_f_size_);
+    } else {
+      occurrence_2 = Occ_Function_Lg(
+          c, upper_index, occ_s_table_, s_f_buff_, mapping_table_, num_of_char_,
+          step_s_size_, load_s_, load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+    }
+    upper = c_s_table_[c - 1] + occurrence_2;
+    if (!load_s_) {
+      int temp_c = '\0';
+      lseek(s_f_, upper_index - 1, SEEK_SET);
+      read(s_f_, &temp_c, 1);
+      if (temp_c == c) {
+        upper_want = true;
+      }
+    } else {
+      upper_want = (s_f_buff_[upper_index - 1] == c);
+    }
+    padding_0_2 = (upper_want)
+                      ? pre_upper - Select_Lg(upper_index, select_b_table_,
+                                              b_f_buff_, interval_b_, load_b_,
+                                              load_s_b_, b_f_, bs_i_f_)
+                      : 0;
+    if (!upper_want) {
+      if (upper == static_cast<int>(s_f_size_)) {
+        upper = max_index - 1;
+      } else {
+        upper = Select_Lg(upper + 1, select_bb_table_, bb_f_buff_, interval_bb_,
+                          load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
+                1;
+      }
+    } else {
+      upper = Select_Lg(upper, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+              padding_0_2;
+    }
+    if (upper >= lower_bound && upper <= upper_bound) {
+      return 0;
+    }
+    if (c == ']') {
+      return 1;
+    }
+    int count = 0, rank_index = 0;
+    rank_index = rank_lg_function(b_f_buff_, occ_b_table_, upper + 1, 8,
+                                  load_r_b_, load_b_, b_f_, b_i_f_);
+    if (load_s_) {
+      c = s_f_buff_[rank_index - 1];
+    } else {
+      lseek(s_f_, rank_index - 1, SEEK_SET);
+      read(s_f_, &c, 1);
+    }
+    count += recursive_count(upper, upper, c, lower_bound, upper_bound);
+    return count;
+  } else {
+    int padding_0_1 = 0, padding_0_2 = 0, pre_lower = 0, pre_upper = 0,
+        upper_index = 0, lower_index = 0,
+        max_index = c_table_[NUMBER_OF_CHAR - 1];
+    bool lower_want = false, upper_want = false;
+    pre_lower = lower;
+    pre_upper = upper;
+    lower_index = rank_lg_function(b_f_buff_, occ_b_table_, lower + 1, 8,
+                                   load_r_b_, load_b_, b_f_, b_i_f_);
+    upper_index = rank_lg_function(b_f_buff_, occ_b_table_, upper + 1, 8,
+                                   load_r_b_, load_b_, b_f_, b_i_f_);
+    if (load_s_ && load_r_s_) {
+      occurrence_1 = Occ_Function_Sm_Md(c, lower_index - 1, occ_s_table_,
+                                        s_f_buff_, mapping_table_, num_of_char_,
+                                        step_s_size_, s_i_f_size_);
+      occurrence_2 = Occ_Function_Sm_Md(c, upper_index, occ_s_table_, s_f_buff_,
+                                        mapping_table_, num_of_char_,
+                                        step_s_size_, s_i_f_size_);
+    } else {
+      occurrence_1 =
+          Occ_Function_Lg(c, lower_index - 1, occ_s_table_, s_f_buff_,
+                          mapping_table_, num_of_char_, step_s_size_, load_s_,
+                          load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+      occurrence_2 = Occ_Function_Lg(
+          c, upper_index, occ_s_table_, s_f_buff_, mapping_table_, num_of_char_,
+          step_s_size_, load_s_, load_r_s_, s_f_, s_i_f_, s_i_f_size_);
+    }
+    lower = c_s_table_[c - 1] + occurrence_1 + 1;
+    upper = c_s_table_[c - 1] + occurrence_2;
+    if (!load_s_) {
+      int temp_c = '\0';
+      lseek(s_f_, upper_index - 1, SEEK_SET);
+      read(s_f_, &temp_c, 1);
+      if (temp_c == c) {
+        upper_want = true;
+      }
+      lseek(s_f_, lower_index - 1, SEEK_SET);
+      read(s_f_, &temp_c, 1);
+      if (temp_c == c) {
+        lower_want = true;
+      }
+    } else {
+      lower_want = (s_f_buff_[lower_index - 1] == c);
+      upper_want = (s_f_buff_[upper_index - 1] == c);
+    }
+    padding_0_1 = (lower_want)
+                      ? pre_lower - Select_Lg(lower_index, select_b_table_,
+                                              b_f_buff_, interval_b_, load_b_,
+                                              load_s_b_, b_f_, bs_i_f_)
+                      : 0;
+    padding_0_2 = (upper_want)
+                      ? pre_upper - Select_Lg(upper_index, select_b_table_,
+                                              b_f_buff_, interval_b_, load_b_,
+                                              load_s_b_, b_f_, bs_i_f_)
+                      : 0;
+    if (!lower_want) {
+      lower = Select_Lg(lower, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_);
+    } else {
+      lower = Select_Lg(lower, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+              padding_0_1;
+    }
+    if (!upper_want) {
+      if (upper == static_cast<int>(s_f_size_)) {
+        upper = max_index - 1;
+      } else {
+        upper = Select_Lg(upper + 1, select_bb_table_, bb_f_buff_, interval_bb_,
+                          load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
+                1;
+      }
+    } else {
+      upper = Select_Lg(upper, select_bb_table_, bb_f_buff_, interval_bb_,
+                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
+              padding_0_2;
+    }
+    if ((lower >= lower_bound && lower <= upper_bound) ||
+        (upper >= lower_bound && upper <= upper_bound)) {
+      return 0;
+    }
+    if (c == ']') {
+      return upper - lower + 1;
+    }
+    int count = 0, rank_index = 0;
+    bool arr[NUMBER_OF_CHAR] = {false};
+    for (int i = lower; i <= upper; ++i) {
+      rank_index = rank_lg_function(b_f_buff_, occ_b_table_, i + 1, 8,
+                                    load_r_b_, load_b_, b_f_, b_i_f_);
+      if (load_s_) {
+        c = s_f_buff_[rank_index - 1];
+      } else {
+        lseek(s_f_, rank_index - 1, SEEK_SET);
+        read(s_f_, &c, 1);
+      }
+      if (arr[c] == false) {
+        arr[c] = true;
+      } else {
+        continue;
+      }
+      count += recursive_count(lower, upper, c, lower_bound, upper_bound);
+    }
+    return count;
+  }
 }
 
 int RLEBWT::search_r_lg() {
@@ -392,70 +746,24 @@ int RLEBWT::search_r_lg() {
   bool index_want = false;
   get_lower_uppder_bound_lg(lower_bound, upper_bound, c);
   if (upper_bound >= lower_bound) {
-    int occ = 0, curr_index = 0, padding = 0, cc = 0;
-    int max_index = c_table_[NUMBER_OF_CHAR - 1], pre_index = 0, rank_index = 0;
+    int rank_index = 0, cc = 0;
+    bool arr[NUMBER_OF_CHAR] = {false};
     for (int i = lower_bound; i <= upper_bound; ++i) {
-      curr_index = i;
-      while (true) {
-        pre_index = curr_index;
-        rank_index = rank_lg_function(b_f_buff_, occ_b_table_, curr_index + 1,
-                                      8, load_r_b_, load_b_, b_f_, b_i_f_);
-        if (load_s_) {
-          cc = s_f_buff_[rank_index - 1];
-        } else {
-          lseek(s_f_, rank_index - 1, SEEK_SET);
-          read(s_f_, &cc, 1);
-        }
-        if (cc == ']') {
-          ++count;
-          break;
-        }
-        if (load_s_ && load_r_s_) {
-          occ = Occ_Function_Sm_Md(cc, rank_index, occ_s_table_, s_f_buff_,
-                                   mapping_table_, num_of_char_, step_s_size_,
-                                   s_i_f_size_);
-        } else {
-          occ = Occ_Function_Lg(cc, rank_index, occ_s_table_, s_f_buff_,
-                                mapping_table_, num_of_char_, step_s_size_,
-                                load_s_, load_r_s_, s_f_, s_i_f_, s_i_f_size_);
-        }
-        if (load_s_) {
-          index_want = (s_f_buff_[rank_index - 1] == cc);
-        } else {
-          char temp_c = 0;
-          lseek(s_f_, rank_index - 1, SEEK_SET);
-          read(s_f_, &temp_c, 1);
-          if (temp_c == cc) {
-            index_want = true;
-          } else {
-            index_want = false;
-          }
-        }
-        curr_index = c_s_table_[cc - 1] + occ;
-        padding = (index_want)
-                      ? pre_index - Select_Lg(rank_index, select_b_table_,
-                                              b_f_buff_, interval_b_, load_b_,
-                                              load_s_b_, b_f_, bs_i_f_)
-                      : 0;
-        if (!index_want) {
-          if (curr_index == static_cast<int>(s_f_size_)) {
-            curr_index = max_index - 1;
-          } else {
-            curr_index =
-                Select_Lg(curr_index + 1, select_bb_table_, bb_f_buff_,
-                          interval_bb_, load_bb_, load_s_bb_, bb_f_, bb_i_f_) -
-                1;
-          }
-        } else {
-          curr_index =
-              Select_Lg(curr_index, select_bb_table_, bb_f_buff_, interval_bb_,
-                        load_bb_, load_s_bb_, bb_f_, bb_i_f_) +
-              padding;
-        }
-        if (lower_bound <= curr_index && curr_index <= upper_bound) {
-          break;
-        }
+      rank_index = rank_lg_function(b_f_buff_, occ_b_table_, i + 1, 8,
+                                    load_r_b_, load_b_, b_f_, b_i_f_);
+      if (load_s_) {
+        cc = s_f_buff_[rank_index - 1];
+      } else {
+        lseek(s_f_, rank_index - 1, SEEK_SET);
+        read(s_f_, &cc, 1);
       }
+      if (arr[cc] == false) {
+        arr[cc] = true;
+      } else {
+        continue;
+      }
+      count += recursive_count(lower_bound, upper_bound, cc, lower_bound,
+                               upper_bound);
     }
   }
   return count;
@@ -905,7 +1213,8 @@ void RLEBWT::Search_Lg() {
     int count = 0;
     for (int i = 0; i != NUMBER_OF_CHAR; ++i) {
       if (c_s_table_[i]) {
-        mapping_table_[i] = count++;
+        mapping_table_[i] = count;
+        ++count;
       }
     }
     Sum_C_Table();

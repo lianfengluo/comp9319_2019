@@ -49,7 +49,7 @@ void RLEBWT::Build_S_B_Index_SM(int s_f, int b_f) {
   s_f_buff_ = new char[s_f_size_];
   b_f_buff_ = new char[b_f_size_];
   MyArray<int32_t> temp_table = new int32_t[num_of_char_];
-  for (int i = 0; i != num_of_char_; i++) {
+  for (int i = 0; i != num_of_char_; ++i) {
     temp_table[i] = 0;
   }
   s_i_f_size_ = real_chunks_nums * num_of_char_ * 4;
