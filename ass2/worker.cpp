@@ -84,6 +84,18 @@ static size_t fetch_new_bits(int file, MyArray<char>& r_buff2) {
   return read(file, r_buff2.get(), READ_BUFF_SIZE);
 }
 
+void set_bit(uint64_t arr[2], int i) {
+  int rest = (i % 64);
+  int pos = (i / 64);
+  arr[pos] |= (1UL << rest);
+}
+
+bool get_bit(uint64_t arr[2], int i) {
+  int rest = (i % 64);
+  int pos = (i / 64);
+  return arr[pos] & (1UL << rest);
+}
+
 RLEBWT::RLEBWT(char* argv[])
     : filepath_{argv[2]},
       c_table_(NUMBER_OF_CHAR),

@@ -108,6 +108,10 @@ int Compare(const void* a, const void* b);
 
 int64_t pow(int base, int power);
 
+void set_bit(uint64_t arr[2], int i);
+
+bool get_bit(uint64_t arr[2], int i);
+
 class RLEBWT {
  public:
   RLEBWT(char* argv[]);

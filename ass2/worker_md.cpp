@@ -212,7 +212,7 @@ int RLEBWT::search_r_md() {
   get_lower_uppder_bound_md(lower_bound, upper_bound, c);
   if (upper_bound >= lower_bound) {
     int rank_index = 0, cc = 0;
-    bool arr[NUMBER_OF_CHAR] = {false};
+    uint64_t arr[2] = {0UL};
     for (int i = lower_bound; i <= upper_bound; ++i) {
       rank_index = Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, i + 1, 8);
       if (load_s_) {
@@ -221,8 +221,10 @@ int RLEBWT::search_r_md() {
         lseek(s_f_, rank_index - 1, SEEK_SET);
         read(s_f_, &cc, 1);
       }
-      if (arr[cc] == false) {
-        arr[cc] = true;
+      int rest = (cc % 64);
+      int pos = (cc / 64);
+      if (((arr[pos] >> rest) & 1UL) == 0) {
+        arr[pos] |= (1UL << rest);
       } else {
         continue;
       }
@@ -239,7 +241,7 @@ int RLEBWT::search_a_md(MyArray<size_t>& results) {
   get_lower_uppder_bound_md(lower_bound, upper_bound, c);
   if (upper_bound >= lower_bound) {
     int rank_index = 0, cc = 0;
-    bool arr[NUMBER_OF_CHAR] = {false};
+    uint64_t arr[2] = {0UL};
     for (int i = lower_bound; i <= upper_bound; ++i) {
       rank_index = Rank_Sm_Md_Function(b_f_buff_, occ_b_table_, i + 1, 8);
       if (load_s_) {
@@ -248,8 +250,10 @@ int RLEBWT::search_a_md(MyArray<size_t>& results) {
         lseek(s_f_, rank_index - 1, SEEK_SET);
         read(s_f_, &cc, 1);
       }
-      if (arr[cc] == false) {
-        arr[cc] = true;
+      int rest = (cc % 64);
+      int pos = (cc / 64);
+      if (((arr[pos] >> rest) & 1UL) == 0) {
+        arr[pos] |= (1UL << rest);
       } else {
         continue;
       }

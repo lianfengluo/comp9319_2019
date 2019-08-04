@@ -452,7 +452,7 @@ void RLEBWT::recursive_search(int lower, int upper, int c, int lower_bound,
       return;
     }
     int rank_index = 0;
-    bool arr[NUMBER_OF_CHAR] = {false};
+    uint64_t arr[2] = {0UL};
     for (int i = lower; i <= upper; ++i) {
       rank_index = rank_lg_function(b_f_buff_, occ_b_table_, i + 1, 8,
                                     load_r_b_, load_b_, b_f_, b_i_f_);
@@ -462,8 +462,10 @@ void RLEBWT::recursive_search(int lower, int upper, int c, int lower_bound,
         lseek(s_f_, rank_index - 1, SEEK_SET);
         read(s_f_, &c, 1);
       }
-      if (arr[c] == false) {
-        arr[c] = true;
+      int rest = (c % 64);
+      int pos = (c / 64);
+      if (((arr[pos] >> rest) & 1UL) == 0) {
+        arr[pos] |= (1UL << rest);
       } else {
         continue;
       }
@@ -547,7 +549,7 @@ int RLEBWT::search_a_lg(MyArray<size_t>& results) {
   get_lower_uppder_bound_lg(lower_bound, upper_bound, c);
   if (upper_bound >= lower_bound) {
     int rank_index = 0, cc = 0;
-    bool arr[NUMBER_OF_CHAR] = {false};
+    uint64_t arr[2] = {0UL};
     for (int i = lower_bound; i <= upper_bound; ++i) {
       rank_index = rank_lg_function(b_f_buff_, occ_b_table_, i + 1, 8,
                                     load_r_b_, load_b_, b_f_, b_i_f_);
@@ -557,8 +559,10 @@ int RLEBWT::search_a_lg(MyArray<size_t>& results) {
         lseek(s_f_, rank_index - 1, SEEK_SET);
         read(s_f_, &cc, 1);
       }
-      if (arr[cc] == false) {
-        arr[cc] = true;
+      int rest = (cc % 64);
+      int pos = (cc / 64);
+      if (((arr[pos] >> rest) & 1UL) == 0) {
+        arr[pos] |= (1UL << rest);
       } else {
         continue;
       }
@@ -719,7 +723,7 @@ int RLEBWT::recursive_count(int lower, int upper, int c, int lower_bound,
       return upper - lower + 1;
     }
     int count = 0, rank_index = 0;
-    bool arr[NUMBER_OF_CHAR] = {false};
+    uint64_t arr[2] = {0UL};
     for (int i = lower; i <= upper; ++i) {
       rank_index = rank_lg_function(b_f_buff_, occ_b_table_, i + 1, 8,
                                     load_r_b_, load_b_, b_f_, b_i_f_);
@@ -729,8 +733,10 @@ int RLEBWT::recursive_count(int lower, int upper, int c, int lower_bound,
         lseek(s_f_, rank_index - 1, SEEK_SET);
         read(s_f_, &c, 1);
       }
-      if (arr[c] == false) {
-        arr[c] = true;
+      int rest = (c % 64);
+      int pos = (c / 64);
+      if (((arr[pos] >> rest) & 1UL) == 0) {
+        arr[pos] |= (1UL << rest);
       } else {
         continue;
       }
@@ -747,7 +753,7 @@ int RLEBWT::search_r_lg() {
   get_lower_uppder_bound_lg(lower_bound, upper_bound, c);
   if (upper_bound >= lower_bound) {
     int rank_index = 0, cc = 0;
-    bool arr[NUMBER_OF_CHAR] = {false};
+    uint64_t arr[2] = {0UL};
     for (int i = lower_bound; i <= upper_bound; ++i) {
       rank_index = rank_lg_function(b_f_buff_, occ_b_table_, i + 1, 8,
                                     load_r_b_, load_b_, b_f_, b_i_f_);
@@ -757,8 +763,10 @@ int RLEBWT::search_r_lg() {
         lseek(s_f_, rank_index - 1, SEEK_SET);
         read(s_f_, &cc, 1);
       }
-      if (arr[cc] == false) {
-        arr[cc] = true;
+      int rest = (cc % 64);
+      int pos = (cc / 64);
+      if (((arr[pos] >> rest) & 1UL) == 0) {
+        arr[pos] |= (1UL << rest);
       } else {
         continue;
       }
