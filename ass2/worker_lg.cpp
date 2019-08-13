@@ -1,9 +1,6 @@
 #include "worker.h"
 
 const int STEP_LG_B = 8;
-static constexpr uint8_t B2 = (1 << 4) - 1;
-static constexpr uint8_t B1 = B2 ^ (B2 << 2);
-static constexpr uint8_t B0 = B1 ^ (B1 << 1);
 
 static int rank_lg_function(const MyArray<char>& buff,
                             const MyArray<int32_t>& occ, int index,
@@ -12,7 +9,8 @@ static int rank_lg_function(const MyArray<char>& buff,
   // bit position, every 32 bits(4 byte * 8) get one record;
   const int step_bits = step_record * 8;
   int location_b_chunk = index / step_bits;
-  int b_start_place = 0, occ_b = 0, byte = 0;
+  int b_start_place = 0, occ_b = 0;
+  char byte = 0;
   if (location_b_chunk > 0) {
     if (load_occ) {
       occ_b = occ[location_b_chunk - 1];
@@ -35,13 +33,17 @@ static int rank_lg_function(const MyArray<char>& buff,
               ++occ_b;
             }
           }
-          return occ_b;
+          break;
         } else {
-          // adding number of bit 1 to the occ_b
-          byte = ((byte >> 1) & B0) + (byte & B0);
-          byte = ((byte >> 2) & B1) + (byte & B1);
-          byte = ((byte >> 4) + byte) & B2;
-          occ_b += byte;
+          // while (byte != 0) {
+          //   byte &= (byte - 1);
+          //   ++occ_b;
+          // }
+          for (int i = 0; i != 8; ++i) {
+            if ((byte << i) & FIRST_BIT) {
+              ++occ_b;
+            }
+          }
           ++b_start_byte_pos;
         }
       }
@@ -57,12 +59,17 @@ static int rank_lg_function(const MyArray<char>& buff,
               ++occ_b;
             }
           }
-          return occ_b;
+          break;
         } else {
-          byte = ((byte >> 1) & B0) + (byte & B0);
-          byte = ((byte >> 2) & B1) + (byte & B1);
-          byte = ((byte >> 4) + byte) & B2;
-          occ_b += byte;
+          for (int i = 0; i != 8; ++i) {
+            if ((byte << i) & FIRST_BIT) {
+              ++occ_b;
+            }
+          }
+          // while (byte != 0) {
+          //   byte &= (byte - 1);
+          //   ++occ_b;
+          // }
         }
       }
     }

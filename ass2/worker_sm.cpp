@@ -1,9 +1,5 @@
 #include "worker.h"
 
-static constexpr uint8_t B2 = (1 << 4) - 1;
-static constexpr uint8_t B1 = B2 ^ (B2 << 2);
-static constexpr uint8_t B0 = B1 ^ (B1 << 1);
-
 void RLEBWT::Build_BB_Index_SM() {
   bb_f_buff_ = new char[b_f_size_];
   int write_pos = 0, bit_index = 0, num_of_1 = 0, c = 0, write_pos_bb = 0;
@@ -177,13 +173,13 @@ int Rank_Sm_Md_Function(const MyArray<char>& buff, const MyArray<int32_t>& occ,
             ++occ_b;
           }
         }
-        return occ_b;
+        break;
       } else {
-        // adding number of bit 1 to the occ_b
-        byte = ((byte >> 1) & B0) + (byte & B0);
-        byte = ((byte >> 2) & B1) + (byte & B1);
-        byte = ((byte >> 4) + byte) & B2;
-        occ_b += byte;
+        for (int i = 0; i != 8; ++i) {
+          if ((byte << i) & FIRST_BIT) {
+            ++occ_b;
+          }
+        }
         ++b_start_byte_pos;
       }
     }
