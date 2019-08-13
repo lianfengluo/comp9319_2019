@@ -173,13 +173,13 @@ int Rank_Sm_Md_Function(const MyArray<char>& buff, const MyArray<int32_t>& occ,
             ++occ_b;
           }
         }
-        break;
+        return occ_b;
       } else {
-        for (int i = 0; i != 8; ++i) {
-          if ((byte << i) & FIRST_BIT) {
-            ++occ_b;
-          }
-        }
+        // adding number of bit 1 to the occ_b
+        byte = ((byte >> 1) & B0) + (byte & B0);
+        byte = ((byte >> 2) & B1) + (byte & B1);
+        byte = ((byte >> 4) + byte) & B2;
+        occ_b += byte;
         ++b_start_byte_pos;
       }
     }
