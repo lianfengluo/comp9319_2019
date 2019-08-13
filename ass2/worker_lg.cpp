@@ -1,9 +1,9 @@
 #include "worker.h"
 
 const int STEP_LG_B = 8;
-constexpr uint8_t B2 = (1 << 4) - 1;
-constexpr uint8_t B1 = B2 ^ (B2 << 2);
-constexpr uint8_t B0 = B1 ^ (B1 << 1);
+static constexpr uint8_t B2 = (1 << 4) - 1;
+static constexpr uint8_t B1 = B2 ^ (B2 << 2);
+static constexpr uint8_t B0 = B1 ^ (B1 << 1);
 
 static int rank_lg_function(const MyArray<char>& buff,
                             const MyArray<int32_t>& occ, int index,

@@ -23,6 +23,7 @@ const int CHUNK_SIZE = NUMBER_OF_CHAR * sizeof(int32_t);
 // 4.25MB
 const int START_UP_SIZE = 4.25 * 1024 * 1024;
 const int TOTAL_SPACE = 16 * 1024 * 1024;
+// const int TOTAL_SPACE = 45 * 1024 * 1024;
 const int WRITE_NUM_OF_CHUNK = 5000;
 // 11.75MB
 const int MAX_FREE_MEMORY = TOTAL_SPACE - START_UP_SIZE;

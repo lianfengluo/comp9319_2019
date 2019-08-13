@@ -1,5 +1,9 @@
 #include "worker.h"
 
+static constexpr uint8_t B2 = (1 << 4) - 1;
+static constexpr uint8_t B1 = B2 ^ (B2 << 2);
+static constexpr uint8_t B0 = B1 ^ (B1 << 1);
+
 void RLEBWT::Build_BB_Index_SM() {
   bb_f_buff_ = new char[b_f_size_];
   int write_pos = 0, bit_index = 0, num_of_1 = 0, c = 0, write_pos_bb = 0;
